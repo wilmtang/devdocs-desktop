@@ -665,7 +665,7 @@ app.on('ready', () => {
 
   Menu.setApplicationMenu(createMenu({cycleTab, selectTabAtIndex}))
   mainWindow = createMainWindow()
-  tray.create(mainWindow)
+  tray.create()
 
   mainWindow.once('ready-to-show', () => {
     // Agent/CI verification runs (see AGENT.md): surface the window without
@@ -690,7 +690,7 @@ app.on('activate', () => {
     win.show()
   } else {
     mainWindow = createMainWindow()
-    tray.create(mainWindow)
+    tray.create()
   }
 })
 

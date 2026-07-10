@@ -1,9 +1,9 @@
 const path = require('node:path')
-const {app, Menu, Tray} = require('electron')
+const {app, BrowserWindow, Menu, Tray} = require('electron')
 
 let tray = null
 
-exports.create = (win) => {
+exports.create = () => {
   if (process.platform === 'darwin' || tray) {
     return
   }
@@ -11,7 +11,9 @@ exports.create = (win) => {
   const iconPath = path.join(__dirname, 'static/tray.png')
 
   const toggleWin = () => {
-    if (win.isDestroyed()) {
+    const win =
+      BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
+    if (!win) {
       return
     }
 

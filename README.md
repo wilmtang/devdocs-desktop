@@ -24,9 +24,9 @@ When closing the window, the app will continue running in the background, in the
 
 ### Global shortcut
 
-Use <kbd>Alt+Space</kbd> to toggle the app from anywhere (show it when you're in another app, hide it when it's focused).
+Use <kbd>Alt+Space</kbd> on macOS or <kbd>Ctrl+Shift+D</kbd> on Windows/Linux to toggle the app from anywhere (show it when you're in another app, hide it when it's focused).
 
-The combo is customizable: open **Preferences** (<kbd>⌘,</kbd>, or the app menu ▸ Settings) and scroll to the **Global Shortcut** section, then click the shortcut field and press the keys you want. The same section lets you enable/disable the shortcut, and it warns you if the combo is already taken by another app (your previous shortcut stays active in that case).
+The combo is customizable: open **Preferences** (<kbd>⌘,</kbd>, or the app menu ▸ Settings) and scroll to the **Global Shortcut** section. Choose **Record** to capture a new combo or **Reset** to restore the platform default. The same section lets you enable/disable the shortcut, and it warns you if the combo is already taken by another app (your previous shortcut stays active in that case).
 
 ## Planned features
 

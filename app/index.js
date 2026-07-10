@@ -37,6 +37,8 @@ if (isMac && process.env.DEVDOCS_BACKGROUND === '1') {
 let mainWindow
 let isQuitting = false
 let urlToOpen
+let isShortcutSuspended = false
+let shortcutResumeTimer
 
 // Track all windows (native tabs create multiple BrowserWindows)
 const allWindows = new Set()
@@ -143,52 +145,139 @@ ipcMain.handle('fs:exists', async (_event, filePath) => {
 
 function getToggleShortcut() {
   const shortcuts = config.get('shortcut') || {}
-  const {accelerator = 'alt+space', enabled = false} = shortcuts.toggleApp || {}
+  const {accelerator = config.DEFAULT_TOGGLE_ACCELERATOR, enabled = false} =
+    shortcuts.toggleApp || {}
   return {accelerator, enabled}
 }
 
-ipcMain.handle('shortcut:get', () => getToggleShortcut())
+function getToggleShortcutState() {
+  const state = getToggleShortcut()
+  let isRegistered = false
+  try {
+    isRegistered = globalShortcut.isRegistered(state.accelerator)
+  } catch {}
+
+  return {
+    ...state,
+    defaultAccelerator: config.DEFAULT_TOGGLE_ACCELERATOR,
+    registered: isRegistered,
+    suspended: isShortcutSuspended,
+  }
+}
+
+function shortcutRegistrationError(accelerator) {
+  return `Couldn't register "${accelerator}" — it may be taken by another app.`
+}
+
+function clearShortcutSuspension() {
+  isShortcutSuspended = false
+  clearTimeout(shortcutResumeTimer)
+  shortcutResumeTimer = undefined
+}
+
+function resumeToggleShortcut() {
+  if (!isShortcutSuspended) {
+    const state = getToggleShortcutState()
+    const ok = !state.enabled || state.registered
+    return {
+      ok,
+      error: ok ? null : shortcutRegistrationError(state.accelerator),
+      ...state,
+    }
+  }
+
+  clearShortcutSuspension()
+  const {accelerator, enabled} = getToggleShortcut()
+  if (!accelerator || !enabled) {
+    return {ok: true, error: null, ...getToggleShortcutState()}
+  }
+
+  const ok = updateShortcut({
+    name: 'toggleApp',
+    accelerator,
+    enabled: true,
+    action: toggleWindow,
+  })
+  return {
+    ok,
+    error: ok ? null : shortcutRegistrationError(accelerator),
+    ...getToggleShortcutState(),
+  }
+}
+
+ipcMain.handle('shortcut:get', () => {
+  const state = getToggleShortcutState()
+  const ok = !state.enabled || state.registered || state.suspended
+  return {
+    ok,
+    error: ok ? null : shortcutRegistrationError(state.accelerator),
+    ...state,
+  }
+})
 
 ipcMain.handle('shortcut:set', (_event, accelerator, enabled) => {
   if (
     typeof accelerator !== 'string' ||
-    accelerator.length === 0 ||
+    accelerator.trim().length === 0 ||
     accelerator.length > 64
   ) {
-    return {ok: false, error: 'Invalid shortcut.', ...getToggleShortcut()}
+    if (isShortcutSuspended) {
+      resumeToggleShortcut()
+    }
+
+    return {ok: false, error: 'Invalid shortcut.', ...getToggleShortcutState()}
   }
 
+  accelerator = accelerator.trim()
   const ok = updateShortcut({
     name: 'toggleApp',
     accelerator,
     enabled: Boolean(enabled),
     action: toggleWindow,
   })
+  clearShortcutSuspension()
   return {
     ok,
-    error: ok
-      ? null
-      : `Couldn't register "${accelerator}" — it may be taken by another app.`,
-    ...getToggleShortcut(),
+    error: ok ? null : shortcutRegistrationError(accelerator),
+    ...getToggleShortcutState(),
   }
 })
 
 // While the settings panel is recording a new combo, release the current
 // registration so pressing the old combo doesn't hide the window mid-recording
-ipcMain.handle('shortcut:suspend', (_event, suspend) => {
+ipcMain.handle('shortcut:suspend', (event, suspend) => {
+  if (!suspend) {
+    return resumeToggleShortcut()
+  }
+
+  if (isShortcutSuspended) {
+    return {ok: true, error: null, ...getToggleShortcutState()}
+  }
+
   const {accelerator, enabled} = getToggleShortcut()
   if (!accelerator || !enabled) {
-    return
+    return {ok: true, error: null, ...getToggleShortcutState()}
   }
 
   try {
-    if (suspend) {
-      globalShortcut.unregister(accelerator)
-    } else if (!globalShortcut.isRegistered(accelerator)) {
-      globalShortcut.register(accelerator, toggleWindow)
+    globalShortcut.unregister(accelerator)
+  } catch {
+    return {
+      ok: false,
+      error: 'Could not pause the current shortcut for recording.',
+      ...getToggleShortcutState(),
     }
-  } catch {}
+  }
+
+  isShortcutSuspended = true
+  clearTimeout(shortcutResumeTimer)
+  shortcutResumeTimer = setTimeout(resumeToggleShortcut, 5 * 60 * 1000)
+  event.sender.once('destroyed', resumeToggleShortcut)
+  event.sender.once('did-start-navigation', resumeToggleShortcut)
+  return {ok: true, error: null, ...getToggleShortcutState()}
 })
+
+ipcMain.on('shortcut:resume', resumeToggleShortcut)
 
 // --- Window creation ---
 

@@ -96,8 +96,12 @@ const shortcut = (() => {
 
   let isRecording = false
   let accelerator = ''
+  let defaultAccelerator = ''
   let isEnabled = false
+  let $fieldset
   let $recorder
+  let $record
+  let $reset
   let $enabled
   let $error
 
@@ -188,6 +192,11 @@ const shortcut = (() => {
     if ($enabled) {
       $enabled.checked = isEnabled
     }
+
+    if ($record) {
+      $record.textContent = isRecording ? 'Cancel' : 'Record'
+      $record.setAttribute('aria-pressed', String(isRecording))
+    }
   }
 
   function showError(message) {
@@ -200,35 +209,67 @@ const shortcut = (() => {
   }
 
   async function apply(nextAccelerator, nextEnabled) {
-    const result = await ipcRenderer.invoke(
-      'shortcut:set',
-      nextAccelerator,
-      nextEnabled,
-    )
-    // On failure the main process keeps (and returns) the previous shortcut
-    accelerator = result.accelerator
-    isEnabled = result.enabled
-    render()
-    showError(result.ok ? null : result.error)
+    try {
+      const result = await ipcRenderer.invoke(
+        'shortcut:set',
+        nextAccelerator,
+        nextEnabled,
+      )
+      // On failure the main process keeps (and returns) the previous shortcut
+      accelerator = result.accelerator
+      isEnabled = result.enabled
+      render()
+      showError(result.ok ? null : result.error)
+      return result.ok
+    } catch {
+      showError('Could not update the global shortcut.')
+      return false
+    }
   }
 
   async function startRecording() {
-    isRecording = true
     showError(null)
-    render()
-    // Release the current registration so pressing the old combo mid-record
-    // doesn't hide the window
-    await ipcRenderer.invoke('shortcut:suspend', true)
+    $record.disabled = true
+    try {
+      // Release the current registration so pressing the old combo mid-record
+      // doesn't hide the window
+      const result = await ipcRenderer.invoke('shortcut:suspend', true)
+      if (!result.ok) {
+        showError(result.error)
+        return
+      }
+
+      isRecording = true
+      render()
+    } catch {
+      showError('Could not start shortcut recording.')
+    } finally {
+      $record.disabled = false
+    }
   }
 
-  async function stopRecording() {
+  async function stopRecording(shouldResume = true) {
     isRecording = false
     render()
-    await ipcRenderer.invoke('shortcut:suspend', false)
+    if (!shouldResume) {
+      return true
+    }
+
+    try {
+      const result = await ipcRenderer.invoke('shortcut:suspend', false)
+      accelerator = result.accelerator
+      isEnabled = result.enabled
+      render()
+      showError(result.ok ? null : result.error)
+      return result.ok
+    } catch {
+      showError('Could not restore the global shortcut.')
+      return false
+    }
   }
 
   // One capture-phase listener, active only while recording
-  function onKeydown(e) {
+  async function onKeydown(e) {
     if (!isRecording) {
       return
     }
@@ -239,7 +280,7 @@ const shortcut = (() => {
     const modifiers = modifiersFromEvent(e)
 
     if (e.key === 'Escape' && modifiers.length === 0) {
-      stopRecording()
+      await stopRecording()
       return
     }
 
@@ -262,8 +303,8 @@ const shortcut = (() => {
       return
     }
 
-    stopRecording()
-    apply([...modifiers, key].join('+'), true)
+    await stopRecording(false)
+    await apply([...modifiers, key].join('+'), true)
   }
 
   function buildFieldset() {
@@ -278,8 +319,10 @@ const shortcut = (() => {
       '<small>Show or hide DevDocs from any app, even when it’s in the background.</small>' +
       '</label>' +
       '<div class="_settings-label _dd-shortcut-row">' +
-      '<button type="button" class="_btn _dd-shortcut-recorder"></button>' +
-      '<small>Click the field, then press the key combination you want.</small>' +
+      '<kbd class="_dd-shortcut-recorder" aria-live="polite"></kbd>' +
+      '<button type="button" class="_btn _dd-shortcut-record">Record</button>' +
+      '<button type="button" class="_btn _dd-shortcut-reset">Reset</button>' +
+      '<small>Record, then press the key combination you want.</small>' +
       '</div>' +
       '<p class="_dd-shortcut-error" hidden></p>' +
       '</div>'
@@ -294,8 +337,8 @@ const shortcut = (() => {
     const style = document.createElement('style')
     style.id = STYLE_ID
     style.textContent =
-      '._dd-shortcut-row{display:flex;align-items:center;gap:.6em;margin-top:.5em}' +
-      '._dd-shortcut-recorder{min-width:7em;font-family:monospace;cursor:pointer}' +
+      '._dd-shortcut-row{display:flex;align-items:center;flex-wrap:wrap;gap:.6em;margin-top:.5em}' +
+      '._dd-shortcut-recorder{min-width:7em;padding:.35em .6em;font-family:monospace;text-align:center;border:1px solid currentColor;border-radius:3px}' +
       '._dd-shortcut-recorder._recording{font-style:italic;opacity:.75}' +
       '._dd-shortcut-row small{margin:0;opacity:.65}' +
       '._dd-shortcut-error{color:#e25252;margin:.4em 0 0}' +
@@ -321,6 +364,7 @@ const shortcut = (() => {
 
     injectStyles()
     const fieldset = buildFieldset()
+    $fieldset = fieldset
     // Place it after the last existing group, before Export/Import & Reset
     // Spread to an array: NodeList has no .at()
     const groups = [...container.querySelectorAll('._settings-fieldset')]
@@ -332,19 +376,25 @@ const shortcut = (() => {
     }
 
     $recorder = fieldset.querySelector('._dd-shortcut-recorder')
+    $record = fieldset.querySelector('._dd-shortcut-record')
+    $reset = fieldset.querySelector('._dd-shortcut-reset')
     $enabled = fieldset.querySelector('._dd-shortcut-enabled')
     $error = fieldset.querySelector('._dd-shortcut-error')
 
-    $recorder.addEventListener('click', () => {
-      if (!isRecording) {
-        startRecording()
+    $record.addEventListener('click', async () => {
+      if (isRecording) {
+        await stopRecording()
+      } else {
+        await startRecording()
       }
     })
-    // Clicking away cancels an in-progress recording
-    $recorder.addEventListener('blur', () => {
+
+    $reset.addEventListener('click', async () => {
       if (isRecording) {
-        stopRecording()
+        await stopRecording(false)
       }
+
+      await apply(defaultAccelerator, isEnabled)
     })
     $enabled.addEventListener('change', () => {
       apply(accelerator, $enabled.checked)
@@ -352,8 +402,10 @@ const shortcut = (() => {
 
     const current = await ipcRenderer.invoke('shortcut:get')
     accelerator = current.accelerator
+    defaultAccelerator = current.defaultAccelerator
     isEnabled = current.enabled
     render()
+    showError(current.ok ? null : current.error)
   }
 
   function start() {
@@ -362,9 +414,18 @@ const shortcut = (() => {
     inject()
     // DevDocs is a SPA; re-inject whenever the Preferences page re-renders
     const observer = new MutationObserver(() => {
+      if ($fieldset && !$fieldset.isConnected && isRecording) {
+        stopRecording()
+      }
+
       inject()
     })
     observer.observe(document.body, {childList: true, subtree: true})
+    window.addEventListener('pagehide', () => {
+      if (isRecording) {
+        ipcRenderer.send('shortcut:resume')
+      }
+    })
   }
 
   return {start}

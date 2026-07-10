@@ -3,10 +3,14 @@ const fs = require('node:fs')
 const {app} = require('electron')
 
 const configPath = path.join(app.getPath('userData'), 'config.json')
+const DEFAULT_TOGGLE_ACCELERATOR =
+  process.platform === 'darwin' ? 'Alt+Space' : 'CommandOrControl+Shift+D'
 
 const defaults = {
   lastWindowState: {width: 800, height: 600},
-  shortcut: {toggleApp: {accelerator: 'alt+space', enabled: true}},
+  shortcut: {
+    toggleApp: {accelerator: DEFAULT_TOGGLE_ACCELERATOR, enabled: true},
+  },
   mode: 'dark',
 }
 
@@ -69,6 +73,7 @@ function save() {
 load()
 
 module.exports = {
+  DEFAULT_TOGGLE_ACCELERATOR,
   get(key) {
     return data[key]
   },

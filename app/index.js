@@ -40,6 +40,7 @@ let isQuitting = false
 let urlToOpen
 let isShortcutSuspended = false
 let shortcutResumeTimer
+let shortcutRecorder
 
 // Track all windows (native tabs create multiple BrowserWindows)
 const allWindows = new Set()
@@ -175,6 +176,14 @@ function clearShortcutSuspension() {
   isShortcutSuspended = false
   clearTimeout(shortcutResumeTimer)
   shortcutResumeTimer = undefined
+  if (shortcutRecorder) {
+    shortcutRecorder.removeListener('destroyed', resumeToggleShortcut)
+    shortcutRecorder.removeListener(
+      'did-start-navigation',
+      resumeToggleShortcut,
+    )
+    shortcutRecorder = undefined
+  }
 }
 
 function resumeToggleShortcut() {
@@ -274,8 +283,9 @@ ipcMain.handle('shortcut:suspend', (event, suspend) => {
   isShortcutSuspended = true
   clearTimeout(shortcutResumeTimer)
   shortcutResumeTimer = setTimeout(resumeToggleShortcut, 5 * 60 * 1000)
-  event.sender.once('destroyed', resumeToggleShortcut)
-  event.sender.once('did-start-navigation', resumeToggleShortcut)
+  shortcutRecorder = event.sender
+  shortcutRecorder.once('destroyed', resumeToggleShortcut)
+  shortcutRecorder.once('did-start-navigation', resumeToggleShortcut)
   return {ok: true, error: null, ...getToggleShortcutState()}
 })
 

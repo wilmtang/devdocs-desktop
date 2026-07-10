@@ -56,16 +56,16 @@ globalThis.Searcher = class Searcher {
     const $wrapper = document.createElement('div')
     $wrapper.innerHTML =
       '<div class="searcher searcher__hidden">' +
-      '<input autofocus type="search" class="searcher-input" placeholder="Search..." />' +
+      '<input autofocus type="search" class="searcher-input" aria-label="Search in page" placeholder="Search..." />' +
       '<span class="searcher-progress searcher-progress__disabled"></span>' +
-      '<button class="searcher-action searcher-prev">' +
-      '<svg viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentcolor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">' +
+      '<button type="button" class="searcher-action searcher-prev" aria-label="Previous match">' +
+      '<svg aria-hidden="true" focusable="false" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentcolor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">' +
       '<path d="M30 20 L16 8 2 20" /></svg></button>' +
-      '<button class="searcher-action searcher-next">' +
-      '<svg viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentcolor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">' +
+      '<button type="button" class="searcher-action searcher-next" aria-label="Next match">' +
+      '<svg aria-hidden="true" focusable="false" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentcolor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">' +
       '<path d="M30 12 L16 24 2 12" /></svg></button>' +
-      '<button class="searcher-action searcher-close">' +
-      '<svg viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentcolor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">' +
+      '<button type="button" class="searcher-action searcher-close" aria-label="Close search">' +
+      '<svg aria-hidden="true" focusable="false" viewBox="0 0 32 32" width="32" height="32" fill="none" stroke="currentcolor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">' +
       '<path d="M2 30 L30 2 M30 30 L2 2" /></svg></button></div>'
     document.body.append($wrapper)
     this.$searcher = $wrapper.querySelector('.searcher')
@@ -90,6 +90,10 @@ globalThis.Searcher = class Searcher {
     this.$close.addEventListener('click', () => this.close())
 
     this.target.addEventListener('found-in-page', (e) => {
+      if (!this.opened) {
+        return
+      }
+
       const r = e.result
       this.#showProgress(r.activeMatchOrdinal, r.matches)
       this.$input.focus()
@@ -106,13 +110,17 @@ globalThis.Searcher = class Searcher {
   }
 
   #find(value, options) {
-    if (value) {
-      // findNext: false starts a new find session; true advances within it
-      const isFindNext = value === this.#activeQuery
-      this.#activeQuery = value
-      this.target.findInPage(value, {...options, findNext: isFindNext})
+    if (!value) {
+      this.#activeQuery = null
+      this.target.stopFindInPage('clearSelection')
+      this.$progress.classList.add('searcher-progress__disabled')
+      return this
     }
 
+    // findNext: false starts a new find session; true advances within it
+    const isFindNext = value === this.#activeQuery
+    this.#activeQuery = value
+    this.target.findInPage(value, {...options, findNext: isFindNext})
     return this
   }
 

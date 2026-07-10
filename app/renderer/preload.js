@@ -54,6 +54,7 @@ document.addEventListener('change', (e) => {
 const shortcut = (() => {
   const isMac = process.platform === 'darwin'
   const FIELDSET_ID = 'devdocs-desktop-shortcut'
+  const TAB_FIELDSET_ID = 'devdocs-desktop-tab-navigation'
   const STYLE_ID = 'devdocs-desktop-shortcut-style'
 
   // macOS modifier glyphs, in the conventional ⌃⌥⇧⌘ order
@@ -104,6 +105,7 @@ const shortcut = (() => {
   let $reset
   let $enabled
   let $error
+  let $tabNavigation
 
   function modifiersFromEvent(e) {
     const mods = []
@@ -329,6 +331,26 @@ const shortcut = (() => {
     return fieldset
   }
 
+  function buildTabFieldset() {
+    const fieldset = document.createElement('div')
+    fieldset.className = '_settings-fieldset'
+    fieldset.id = TAB_FIELDSET_ID
+    fieldset.innerHTML =
+      '<h2 class="_settings-legend">Tab Navigation:</h2>' +
+      '<div class="_settings-inputs">' +
+      '<label class="_settings-label">Ctrl+Tab switches tabs by:' +
+      '<select class="_dd-tab-navigation">' +
+      '<option value="sequential">Left/right order</option>' +
+      '<option value="recent">Most recently used</option>' +
+      '</select>' +
+      (isMac
+        ? '<small>⌘⇧[ and ⌘⇧] always move left and right.</small>'
+        : '<small>Ctrl+Shift+Tab moves backward.</small>') +
+      '</label>' +
+      '</div>'
+    return fieldset
+  }
+
   function injectStyles() {
     if (document.querySelector('#' + STYLE_ID)) {
       return
@@ -364,15 +386,16 @@ const shortcut = (() => {
 
     injectStyles()
     const fieldset = buildFieldset()
+    const tabFieldset = buildTabFieldset()
     $fieldset = fieldset
     // Place it after the last existing group, before Export/Import & Reset
     // Spread to an array: NodeList has no .at()
     const groups = [...container.querySelectorAll('._settings-fieldset')]
     const last = groups.at(-1)
     if (last) {
-      last.after(fieldset)
+      last.after(fieldset, tabFieldset)
     } else {
-      container.querySelector('._lined-heading').after(fieldset)
+      container.querySelector('._lined-heading').after(fieldset, tabFieldset)
     }
 
     $recorder = fieldset.querySelector('._dd-shortcut-recorder')
@@ -380,6 +403,7 @@ const shortcut = (() => {
     $reset = fieldset.querySelector('._dd-shortcut-reset')
     $enabled = fieldset.querySelector('._dd-shortcut-enabled')
     $error = fieldset.querySelector('._dd-shortcut-error')
+    $tabNavigation = tabFieldset.querySelector('._dd-tab-navigation')
 
     $record.addEventListener('click', async () => {
       if (isRecording) {
@@ -399,11 +423,26 @@ const shortcut = (() => {
     $enabled.addEventListener('change', () => {
       apply(accelerator, $enabled.checked)
     })
+    $tabNavigation.addEventListener('change', async () => {
+      const ok = await ipcRenderer.invoke(
+        'tabs:set-navigation-mode',
+        $tabNavigation.value,
+      )
+      if (!ok) {
+        $tabNavigation.value = await ipcRenderer.invoke(
+          'tabs:get-navigation-mode',
+        )
+      }
+    })
 
-    const current = await ipcRenderer.invoke('shortcut:get')
+    const [current, tabNavigation] = await Promise.all([
+      ipcRenderer.invoke('shortcut:get'),
+      ipcRenderer.invoke('tabs:get-navigation-mode'),
+    ])
     accelerator = current.accelerator
     defaultAccelerator = current.defaultAccelerator
     isEnabled = current.enabled
+    $tabNavigation.value = tabNavigation
     render()
     showError(current.ok ? null : current.error)
   }

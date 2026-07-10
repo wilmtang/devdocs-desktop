@@ -28,12 +28,15 @@ Use <kbd>Alt+Space</kbd> on macOS or <kbd>Ctrl+Shift+D</kbd> on Windows/Linux to
 
 The combo is customizable: open **Preferences** (<kbd>⌘,</kbd>, or the app menu ▸ Settings) and scroll to the **Global Shortcut** section. Choose **Record** to capture a new combo or **Reset** to restore the platform default. The same section lets you enable/disable the shortcut, and it warns you if the combo is already taken by another app (your previous shortcut stays active in that case).
 
+### Tabs
+
+Use <kbd>Ctrl+Tab</kbd> and <kbd>Ctrl+Shift+Tab</kbd> to switch tabs. Preferences lets you choose left/right order or most-recently-used order. On macOS, <kbd>⌘⇧[</kbd> and <kbd>⌘⇧]</kbd> always move left and right, while <kbd>⌘1</kbd> through <kbd>⌘9</kbd> select a tab directly. The number shortcuts use <kbd>Ctrl</kbd> on Windows/Linux.
+
 ## Planned features
 
 Please consider [sponsoring me](http://github.com/sponsors/egoist) to accelerate development.
 
 - Menubar mode: switch beween desktop mode and menubar mode
-- Tabs support: allow to open documentation in a new tab
 
 ## Install
 

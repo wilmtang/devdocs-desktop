@@ -13,6 +13,7 @@ const config = require('./config.js')
 const tray = require('./tray.js')
 const updater = require('./updater.js')
 const {configDir, updateShortcut} = require('./utils.js')
+const {pickRecentTab, pickSequentialTab} = require('./tabs.js')
 
 process.title = 'DevDocs'
 app.setName('DevDocs')
@@ -42,6 +43,7 @@ let shortcutResumeTimer
 
 // Track all windows (native tabs create multiple BrowserWindows)
 const allWindows = new Set()
+const recentWindows = []
 
 if (!app.requestSingleInstanceLock()) {
   // Exit immediately: app.quit() alone lets the rest of startup run first
@@ -279,6 +281,82 @@ ipcMain.handle('shortcut:suspend', (event, suspend) => {
 
 ipcMain.on('shortcut:resume', resumeToggleShortcut)
 
+// --- Tab navigation ---
+
+function getTabNavigationMode() {
+  return config.get('tabNavigation') === 'recent' ? 'recent' : 'sequential'
+}
+
+ipcMain.handle('tabs:get-navigation-mode', () => getTabNavigationMode())
+
+ipcMain.handle('tabs:set-navigation-mode', (_event, mode) => {
+  if (mode !== 'sequential' && mode !== 'recent') {
+    return false
+  }
+
+  config.set('tabNavigation', mode)
+  return true
+})
+
+function openWindows() {
+  return [...allWindows].filter((win) => !win.isDestroyed())
+}
+
+function rememberWindow(win) {
+  const index = recentWindows.indexOf(win)
+  if (index !== -1) {
+    recentWindows.splice(index, 1)
+  }
+
+  recentWindows.unshift(win)
+}
+
+function forgetWindow(win) {
+  const index = recentWindows.indexOf(win)
+  if (index !== -1) {
+    recentWindows.splice(index, 1)
+  }
+}
+
+function focusWindow(win) {
+  if (!win || win.isDestroyed()) {
+    return
+  }
+
+  if (win.isMinimized()) {
+    win.restore()
+  }
+
+  win.show()
+  win.focus()
+}
+
+function cycleTab(direction, isSequential = false) {
+  const windows = openWindows()
+  const current = BrowserWindow.getFocusedWindow()
+  const mode = isSequential ? 'sequential' : getTabNavigationMode()
+
+  if (isMac && mode === 'sequential' && current) {
+    if (direction > 0) {
+      current.selectNextTab()
+    } else {
+      current.selectPreviousTab()
+    }
+
+    return
+  }
+
+  const history = recentWindows.filter((win) => windows.includes(win))
+  const target =
+    (mode === 'recent' && pickRecentTab(history, current, direction)) ||
+    pickSequentialTab(windows, current, direction)
+  focusWindow(target)
+}
+
+function selectTabAtIndex(index) {
+  focusWindow(openWindows()[index])
+}
+
 // --- Window creation ---
 
 function toggleWindow() {
@@ -348,6 +426,7 @@ function createTabWindow(url) {
 
   win.on('closed', () => {
     allWindows.delete(win)
+    forgetWindow(win)
   })
 
   return win
@@ -389,6 +468,7 @@ function createMainWindow() {
 
   win.on('closed', () => {
     allWindows.delete(win)
+    forgetWindow(win)
   })
 
   return win
@@ -573,7 +653,7 @@ app.on('ready', () => {
     }
   }
 
-  Menu.setApplicationMenu(createMenu())
+  Menu.setApplicationMenu(createMenu({cycleTab, selectTabAtIndex}))
   mainWindow = createMainWindow()
   tray.create(mainWindow)
 
@@ -605,12 +685,10 @@ app.on('activate', () => {
 })
 
 let hasOpenedOnce = false
-app.on('browser-window-focus', () => {
+app.on('browser-window-focus', (_event, win) => {
+  rememberWindow(win)
   if (hasOpenedOnce) {
-    const win = BrowserWindow.getFocusedWindow()
-    if (win) {
-      win.webContents.send('focus-webview')
-    }
+    win.webContents.send('focus-webview')
   } else {
     hasOpenedOnce = true
   }

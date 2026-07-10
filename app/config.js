@@ -11,6 +11,7 @@ const defaults = {
   shortcut: {
     toggleApp: {accelerator: DEFAULT_TOGGLE_ACCELERATOR, enabled: true},
   },
+  tabNavigation: 'sequential',
   mode: 'dark',
 }
 

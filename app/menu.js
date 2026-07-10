@@ -13,7 +13,7 @@ function sendAction(action, ...args) {
   }
 }
 
-function createMenu() {
+function createMenu({cycleTab, selectTabAtIndex}) {
   const preferences = [
     {
       // Standard Settings entry (⌘, / Ctrl+,). Opens DevDocs' own Preferences
@@ -89,6 +89,16 @@ function createMenu() {
     },
   }
 
+  const numberedTabShortcuts = Array.from({length: 9}, (_value, index) => ({
+    label: `Select Tab ${index + 1}`,
+    accelerator: `CmdOrCtrl+${index + 1}`,
+    visible: false,
+    acceleratorWorksWhenHidden: true,
+    click() {
+      selectTabAtIndex(index)
+    },
+  }))
+
   const template = [
     {
       label: 'DevDocs',
@@ -148,6 +158,46 @@ function createMenu() {
             }
           },
         },
+        {
+          type: 'separator',
+        },
+        {
+          label: 'Next Tab',
+          accelerator: 'Control+Tab',
+          click() {
+            cycleTab(1)
+          },
+        },
+        {
+          label: 'Previous Tab',
+          accelerator: 'Control+Shift+Tab',
+          click() {
+            cycleTab(-1)
+          },
+        },
+        ...(isMac
+          ? [
+              {
+                label: 'Previous Tab',
+                accelerator: 'Command+Shift+[',
+                visible: false,
+                acceleratorWorksWhenHidden: true,
+                click() {
+                  cycleTab(-1, true)
+                },
+              },
+              {
+                label: 'Next Tab',
+                accelerator: 'Command+Shift+]',
+                visible: false,
+                acceleratorWorksWhenHidden: true,
+                click() {
+                  cycleTab(1, true)
+                },
+              },
+            ]
+          : []),
+        ...numberedTabShortcuts,
       ],
     },
     {

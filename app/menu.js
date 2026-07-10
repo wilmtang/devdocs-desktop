@@ -5,9 +5,13 @@ const pkg = require('./package.json')
 const isMac = process.platform === 'darwin'
 
 function sendAction(action, ...args) {
-  const [win] = BrowserWindow.getAllWindows()
+  const win =
+    BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
   if (win) {
-    win.restore()
+    if (win.isMinimized()) {
+      win.restore()
+    }
+
     win.show()
     win.webContents.send(action, ...args)
   }
@@ -286,8 +290,8 @@ function createMenu({cycleTab, selectTabAtIndex}) {
         {
           label: 'Search In Page',
           accelerator: 'CmdOrCtrl+F',
-          click(item, focusedWindow) {
-            focusedWindow.webContents.send('open-search')
+          click() {
+            sendAction('open-search')
           },
         },
         {

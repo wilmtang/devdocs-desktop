@@ -14,9 +14,14 @@ const tray = require('./tray.js')
 const updater = require('./updater.js')
 const {configDir, updateShortcut} = require('./utils.js')
 
+process.title = 'DevDocs'
+app.setName('DevDocs')
 app.setAppUserModelId('sh.egoist.devdocs')
 
 const isMac = process.platform === 'darwin'
+const developmentIcon = app.isPackaged
+  ? undefined
+  : path.join(__dirname, '..', 'build', 'icon.png')
 
 // Verification/CI runs launch with DEVDOCS_BACKGROUND=1 (see AGENT.md). Present
 // the app as an accessory agent — the runtime equivalent of LSUIElement — so the
@@ -231,6 +236,7 @@ function createTabWindow(url) {
 
   const win = new BrowserWindow({
     title: app.name,
+    icon: developmentIcon,
     x,
     y,
     width: lastWindowState.width || 800,
@@ -263,6 +269,7 @@ function createMainWindow() {
 
   const win = new BrowserWindow({
     title: app.name,
+    icon: developmentIcon,
     x: lastWindowState.x,
     y: lastWindowState.y,
     width: lastWindowState.width || 800,
@@ -465,6 +472,10 @@ function buildContextMenu(parameters, webContents) {
 // --- App lifecycle ---
 
 app.on('ready', () => {
+  if (isMac && developmentIcon) {
+    app.dock.setIcon(developmentIcon)
+  }
+
   const shortcuts = config.get('shortcut')
   for (const name in shortcuts) {
     const {accelerator, enabled} = shortcuts[name] || {}

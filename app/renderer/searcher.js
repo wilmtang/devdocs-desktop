@@ -1,8 +1,90 @@
+function findMarkerPositions(root, value, doc = document) {
+  if (!value || root.scrollHeight === 0) {
+    return []
+  }
+
+  const query = value.toLocaleLowerCase()
+  const rootTop = root.getBoundingClientRect().top
+  const positions = new Set()
+  const walker = doc.createTreeWalker(
+    root,
+    doc.defaultView.NodeFilter.SHOW_TEXT,
+  )
+
+  // ponytail: DevDocs text-node matches cover its docs; build a rendered-text
+  // index only if split-node phrases need scrollbar markers.
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.data.toLocaleLowerCase()
+    let start = text.indexOf(query)
+    while (start !== -1) {
+      const range = doc.createRange()
+      range.setStart(node, start)
+      range.setEnd(node, start + query.length)
+      const rect = range.getBoundingClientRect()
+      if (rect.width && rect.height) {
+        const top =
+          ((rect.top - rootTop + root.scrollTop) / root.scrollHeight) * 100
+        positions.add(Math.max(0, Math.min(100, top)).toFixed(3))
+      }
+
+      start = text.indexOf(query, start + query.length)
+    }
+  }
+
+  return [...positions]
+}
+
+function findInPageOptions(options, isFindNext) {
+  return isFindNext ? {...options, findNext: true} : options
+}
+
+function renderFindMarkers(value, getPositions) {
+  const id = '__devdocs-find-markers'
+  document.querySelector('#' + id)?.remove()
+
+  const root = document.querySelector('._content')
+  if (!root || !value) {
+    return
+  }
+
+  const rootRect = root.getBoundingClientRect()
+  const rail = document.createElement('div')
+  rail.id = id
+  rail.setAttribute('aria-hidden', 'true')
+  Object.assign(rail.style, {
+    position: 'fixed',
+    top: rootRect.top + 'px',
+    right: Math.max(0, innerWidth - rootRect.right) + 'px',
+    width: '8px',
+    height: rootRect.height + 'px',
+    zIndex: '2147483647',
+    pointerEvents: 'none',
+  })
+
+  for (const top of getPositions(root, value, document)) {
+    const marker = document.createElement('span')
+    Object.assign(marker.style, {
+      position: 'absolute',
+      top: top + '%',
+      right: '2px',
+      width: '6px',
+      height: '2px',
+      background: '#fbbc04',
+      borderRadius: '1px',
+      transform: 'translateY(-1px)',
+    })
+    rail.append(marker)
+  }
+
+  document.body.append(rail)
+}
+
 // Renderer scripts are classic <script> tags, so expose the class globally
 // eslint-disable-next-line unicorn/no-global-object-property-assignment
 globalThis.Searcher = class Searcher {
   #listeners = {}
   #activeQuery = null
+  #markerRequestId = null
   target
   opened = false
   initialized = false
@@ -46,7 +128,9 @@ globalThis.Searcher = class Searcher {
   close() {
     this.opened = false
     this.#activeQuery = null
+    this.#markerRequestId = null
     this.target.stopFindInPage('clearSelection')
+    this.#updateMarkers('')
     this.#hideSearcher()
     this.#emit('close')
   }
@@ -97,6 +181,10 @@ globalThis.Searcher = class Searcher {
       const r = e.result
       this.#showProgress(r.activeMatchOrdinal, r.matches)
       this.$input.focus()
+      if (r.finalUpdate && r.requestId === this.#markerRequestId) {
+        this.#markerRequestId = null
+        this.#updateMarkers(this.#activeQuery)
+      }
     })
     this.#emit('initialized')
   }
@@ -112,16 +200,33 @@ globalThis.Searcher = class Searcher {
   #find(value, options) {
     if (!value) {
       this.#activeQuery = null
+      this.#markerRequestId = null
       this.target.stopFindInPage('clearSelection')
+      this.#updateMarkers('')
       this.$progress.classList.add('searcher-progress__disabled')
       return this
     }
 
-    // findNext: false starts a new find session; true advances within it
+    // Omitting findNext starts a session; Electron 43 ignores explicit false.
     const isFindNext = value === this.#activeQuery
     this.#activeQuery = value
-    this.target.findInPage(value, {...options, findNext: isFindNext})
+    const requestId = this.target.findInPage(
+      value,
+      findInPageOptions(options, isFindNext),
+    )
+    if (!isFindNext) {
+      this.#markerRequestId = requestId
+    }
+
     return this
+  }
+
+  #updateMarkers(value) {
+    this.target
+      .executeJavaScript(
+        `(${renderFindMarkers})(${JSON.stringify(value)}, ${findMarkerPositions})`,
+      )
+      .catch(() => {})
   }
 
   #showProgress(current, total) {
@@ -134,4 +239,8 @@ globalThis.Searcher = class Searcher {
     this.$searcher.classList.add('searcher__hidden')
     this.$input.value = ''
   }
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = {findInPageOptions, findMarkerPositions}
 }

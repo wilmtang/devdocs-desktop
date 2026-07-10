@@ -315,17 +315,21 @@ the current page is provided by the shell. `searcher.js` is a dependency-free
 widget class living in the host page:
 
 - UI is lazily built on first open (constructor is cheap; `#initialize()`
-  runs once).
+  runs once) and docked to the host page's top-right edge.
 - Wraps Chromium's find API on the guest: `webview.findInPage(text, opts)` /
   `stopFindInPage('clearSelection')`.
-- The `findNext` flag semantics are the subtle part: `findNext: false`
-  *starts a find session* (recomputes all matches), `findNext: true`
-  *advances within the current session*. The Searcher tracks
-  `#activeQuery` and passes `findNext: value === this.#activeQuery` — same
-  query means advance, new query means new session.
+- The `findNext` flag semantics are the subtle part: omitting it starts a
+  find session, while `findNext: true` advances within that session. Electron
+  43 ignores a first request that explicitly passes `false`, so the Searcher
+  only adds the option when the query matches `#activeQuery`.
 - Match position ("3/17") comes back asynchronously via the webview's
   `found-in-page` event; the handler also refocuses the input because
   `findInPage` moves focus into the guest.
+- After the native request's `finalUpdate`, the guest scans visible text-node
+  matches in `._content`, deduplicates matches on the same line, and renders
+  yellow location ticks over that pane's scrollbar. Waiting for `finalUpdate`
+  matters: executing guest JavaScript earlier interrupts Chromium's find
+  request. Empty queries and close remove both the selection and marker rail.
 - On close it clears the selection and re-focuses the webview (via the
   `close` event → `webview.focus()` wiring in `main.js`).
 

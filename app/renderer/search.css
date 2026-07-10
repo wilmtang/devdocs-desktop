@@ -1,6 +1,6 @@
 .searcher {
   position: fixed;
-  top: var(--webHeaderHeight);
+  top: 0;
   right: 0;
   padding: 10px;
   background: var(--contentBackground);

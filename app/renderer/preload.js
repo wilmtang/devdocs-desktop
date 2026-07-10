@@ -296,11 +296,12 @@ const shortcut = (() => {
       return
     }
 
-    if (modifiers.length === 0 && !/^F\d+$/v.test(key)) {
+    const hasSafeModifier = modifiers.some((modifier) => modifier !== 'Shift')
+    if (!hasSafeModifier && !/^F\d+$/v.test(key)) {
       showError(
         isMac
-          ? 'Include a modifier key (⌘, ⌥, ⌃ or ⇧).'
-          : 'Include a modifier key (Ctrl, Alt, Super or Shift).',
+          ? 'Include ⌘, ⌥ or ⌃ (Shift may be added).'
+          : 'Include Ctrl, Alt or Super (Shift may be added).',
       )
       return
     }

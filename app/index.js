@@ -15,6 +15,7 @@ const updater = require('./updater.js')
 const {configDir, updateShortcut} = require('./utils.js')
 const {pickRecentTab, pickSequentialTab} = require('./tabs.js')
 const {resolveDeepLink} = require('./deep-link.js')
+const {isSafeAccelerator} = require('./shortcut.js')
 
 process.title = 'DevDocs'
 app.setName('DevDocs')
@@ -169,6 +170,7 @@ function getToggleShortcutState() {
   return {
     ...state,
     defaultAccelerator: config.DEFAULT_TOGGLE_ACCELERATOR,
+    valid: isSafeAccelerator(state.accelerator),
     registered: isRegistered,
     suspended: isShortcutSuspended,
   }
@@ -176,6 +178,16 @@ function getToggleShortcutState() {
 
 function shortcutRegistrationError(accelerator) {
   return `Couldn't register "${accelerator}" — it may be taken by another app.`
+}
+
+function unsafeShortcutError() {
+  return 'Include Ctrl, Alt, Command, or Super for non-function keys.'
+}
+
+function getShortcutError(state) {
+  return state.valid
+    ? shortcutRegistrationError(state.accelerator)
+    : unsafeShortcutError()
 }
 
 function clearShortcutSuspension() {
@@ -209,6 +221,14 @@ function resumeToggleShortcut() {
     return {ok: true, error: null, ...getToggleShortcutState()}
   }
 
+  if (!isSafeAccelerator(accelerator)) {
+    return {
+      ok: false,
+      error: unsafeShortcutError(),
+      ...getToggleShortcutState(),
+    }
+  }
+
   const ok = updateShortcut({
     name: 'toggleApp',
     accelerator,
@@ -224,10 +244,11 @@ function resumeToggleShortcut() {
 
 ipcMain.handle('shortcut:get', () => {
   const state = getToggleShortcutState()
-  const ok = !state.enabled || state.registered || state.suspended
+  const ok =
+    !state.enabled || (state.valid && (state.registered || state.suspended))
   return {
     ok,
-    error: ok ? null : shortcutRegistrationError(state.accelerator),
+    error: ok ? null : getShortcutError(state),
     ...state,
   }
 })
@@ -246,6 +267,18 @@ ipcMain.handle('shortcut:set', (_event, accelerator, enabled) => {
   }
 
   accelerator = accelerator.trim()
+  if (!isSafeAccelerator(accelerator)) {
+    if (isShortcutSuspended) {
+      resumeToggleShortcut()
+    }
+
+    return {
+      ok: false,
+      error: unsafeShortcutError(),
+      ...getToggleShortcutState(),
+    }
+  }
+
   const ok = updateShortcut({
     name: 'toggleApp',
     accelerator,
@@ -664,7 +697,7 @@ app.on('ready', () => {
   const shortcuts = config.get('shortcut')
   for (const name in shortcuts) {
     const {accelerator, enabled} = shortcuts[name] || {}
-    if (accelerator && enabled) {
+    if (accelerator && enabled && isSafeAccelerator(accelerator)) {
       updateShortcut({name, accelerator, enabled: true, action: toggleWindow})
     }
   }

@@ -60,10 +60,20 @@ function createMenu({cycleTab, selectTabAtIndex}) {
       try {
         const res = await fetch(
           'https://api.github.com/repos/egoist/devdocs-desktop/releases/latest',
-          {headers: {Accept: 'application/vnd.github.v3+json'}},
+          {
+            headers: {Accept: 'application/vnd.github.v3+json'},
+            signal: AbortSignal.timeout(10_000),
+          },
         )
+        if (!res.ok) {
+          throw new Error(`GitHub returned ${res.status}`)
+        }
+
         const latest = await res.json()
         const latestVersion = String(latest.tag_name || '').replace(/^v/v, '')
+        if (!latestVersion) {
+          throw new Error('GitHub returned a release without a tag')
+        }
 
         if (latestVersion && compareSemver(latestVersion, pkg.version) === 1) {
           const {response} = await showDialog({
@@ -79,13 +89,13 @@ function createMenu({cycleTab, selectTabAtIndex}) {
             )
           }
         } else {
-          showDialog({
+          await showDialog({
             message: 'No updates',
             detail: 'v' + pkg.version + ' is the latest version.',
           })
         }
       } catch {
-        showDialog({
+        await showDialog({
           message: 'Update check failed',
           detail: 'Could not reach GitHub. Try again later.',
         })

@@ -1,15 +1,29 @@
-window.Searcher = class Searcher {
+// Renderer scripts are classic <script> tags, so expose the class globally
+// eslint-disable-next-line unicorn/no-global-object-property-assignment
+globalThis.Searcher = class Searcher {
+  #listeners = {}
+  target
+  opened = false
+  initialized = false
+  $searcher
+  $progress
+  $input
+  $prev
+  $next
+  $close
+
   constructor(target) {
     this.target = target
-    this._listeners = {}
+  }
+
+  #emit(event) {
+    for (const fn of this.#listeners[event] || []) {
+      fn()
+    }
   }
 
   on(event, fn) {
-    (this._listeners[event] = this._listeners[event] || []).push(fn)
-  }
-
-  _emit(event) {
-    for (const fn of this._listeners[event] || []) fn()
+    ;(this.#listeners[event] ||= []).push(fn)
   }
 
   toggle() {
@@ -17,22 +31,25 @@ window.Searcher = class Searcher {
   }
 
   open() {
-    if (!this.initialized) this._initialize()
+    if (!this.initialized) {
+      this.#initialize()
+    }
+
     this.opened = true
     this.$searcher.classList.remove('searcher__hidden')
     this.$input.focus()
     this.$input.select()
-    this._emit('open')
+    this.#emit('open')
   }
 
   close() {
     this.opened = false
     this.target.stopFindInPage('clearSelection')
-    this._hideSearcher()
-    this._emit('close')
+    this.#hideSearcher()
+    this.#emit('close')
   }
 
-  _initialize() {
+  #initialize() {
     this.initialized = true
     const $wrapper = document.createElement('div')
     $wrapper.innerHTML =
@@ -54,7 +71,7 @@ window.Searcher = class Searcher {
     this.$input = this.$searcher.querySelector('.searcher-input')
     this.$input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
-        this._findNext(e.target.value)
+        this.#findNext(e.target.value)
       } else if (e.key === 'Escape') {
         this.close()
       }
@@ -62,34 +79,44 @@ window.Searcher = class Searcher {
     this.$prev = this.$searcher.querySelector('.searcher-prev')
     this.$next = this.$searcher.querySelector('.searcher-next')
     this.$close = this.$searcher.querySelector('.searcher-close')
-    this.$prev.addEventListener('click', () => this._findPrev(this.$input.value))
-    this.$next.addEventListener('click', () => this._findNext(this.$input.value))
+    this.$prev.addEventListener('click', () =>
+      this.#findPrev(this.$input.value),
+    )
+    this.$next.addEventListener('click', () =>
+      this.#findNext(this.$input.value),
+    )
     this.$close.addEventListener('click', () => this.close())
 
     this.target.addEventListener('found-in-page', (e) => {
-      var r = e.result
-      this._showProgress(r.activeMatchOrdinal, r.matches)
+      const r = e.result
+      this.#showProgress(r.activeMatchOrdinal, r.matches)
       this.$input.focus()
     })
-    this._emit('initialized')
+    this.#emit('initialized')
   }
 
-  _findNext(value, opts) {
-    if (value) this.target.findInPage(value, opts)
+  #findNext(value, options) {
+    if (value) {
+      this.target.findInPage(value, options)
+    }
+
     return this
   }
 
-  _findPrev(value, opts) {
-    if (value) this.target.findInPage(value, Object.assign({ forward: false }, opts))
+  #findPrev(value, options) {
+    if (value) {
+      this.target.findInPage(value, {forward: false, ...options})
+    }
+
     return this
   }
 
-  _showProgress(current, total) {
+  #showProgress(current, total) {
     this.$progress.classList.remove('searcher-progress__disabled')
     this.$progress.textContent = current + '/' + total
   }
 
-  _hideSearcher() {
+  #hideSearcher() {
     this.$progress.classList.add('searcher-progress__disabled')
     this.$searcher.classList.add('searcher__hidden')
     this.$input.value = ''

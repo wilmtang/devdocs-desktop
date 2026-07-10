@@ -1,11 +1,11 @@
-const path = require('path')
-const { app, BrowserWindow, Menu, ipcMain, shell } = require('electron')
-const debug = require('debug')('devdocs-desktop:index')
-const createMenu = require('./menu')
-const config = require('./config')
-const tray = require('./tray')
-const updater = require('./updater')
-const { toggleGlobalShortcut } = require('./utils')
+const path = require('node:path')
+const fs = require('node:fs')
+const {app, BrowserWindow, Menu, ipcMain, shell, dialog} = require('electron')
+const createMenu = require('./menu.js')
+const config = require('./config.js')
+const tray = require('./tray.js')
+const updater = require('./updater.js')
+const {toggleGlobalShortcut} = require('./utils.js')
 
 app.setAppUserModelId('sh.egoist.devdocs')
 
@@ -23,16 +23,17 @@ if (!app.requestSingleInstanceLock()) {
 app.on('second-instance', () => {
   const win = BrowserWindow.getAllWindows()[0]
   if (win) {
-    if (win.isMinimized()) win.restore()
+    if (win.isMinimized()) {
+      win.restore()
+    }
+
     win.show()
   }
 })
 
 // --- IPC handlers ---
 
-ipcMain.handle('config:get', (_event, key) => {
-  return config.get(key)
-})
+ipcMain.handle('config:get', (_event, key) => config.get(key))
 
 ipcMain.handle('config:set', (_event, key, value) => {
   config.set(key, value)
@@ -44,31 +45,26 @@ ipcMain.handle('shell:openExternal', (_event, url) => {
 
 ipcMain.handle('window:maximize', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender)
-  if (win) win.maximize()
+  if (win) {
+    win.maximize()
+  }
 })
 
 ipcMain.handle('dialog:messageBox', async (event, options) => {
-  const { dialog } = require('electron')
   const win = BrowserWindow.fromWebContents(event.sender)
   return dialog.showMessageBox(win, options)
 })
 
-ipcMain.handle('fs:readFile', (_event, filePath) => {
-  const fs = require('fs')
-  return fs.readFileSync(filePath, 'utf8')
-})
+ipcMain.handle('fs:readFile', (_event, filePath) =>
+  fs.readFileSync(filePath, 'utf8'),
+)
 
 ipcMain.handle('fs:writeFile', (_event, filePath, data) => {
-  const fs = require('fs')
-  const path = require('path')
-  fs.mkdirSync(path.dirname(filePath), { recursive: true })
+  fs.mkdirSync(path.dirname(filePath), {recursive: true})
   fs.writeFileSync(filePath, data, 'utf8')
 })
 
-ipcMain.handle('fs:exists', (_event, filePath) => {
-  const fs = require('fs')
-  return fs.existsSync(filePath)
-})
+ipcMain.handle('fs:exists', (_event, filePath) => fs.existsSync(filePath))
 
 // Create a new tab window (triggered by renderer when a link wants a new window)
 ipcMain.on('create-tab', (_event, url) => {
@@ -83,8 +79,12 @@ ipcMain.on('create-tab', (_event, url) => {
 // --- Window creation ---
 
 function toggleWindow() {
-  const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
-  if (!win) return
+  const win =
+    BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
+  if (!win) {
+    return
+  }
+
   if (win.isFocused()) {
     Menu.sendActionToFirstResponder('hide:')
   } else {
@@ -169,8 +169,8 @@ function setupWindow(win, url) {
   })
 
   // Context menu on the main window itself
-  win.webContents.on('context-menu', (_event, params) => {
-    const template = buildContextMenu(params)
+  win.webContents.on('context-menu', (_event, parameters) => {
+    const template = buildContextMenu(parameters)
     if (template.length > 0) {
       Menu.buildFromTemplate(template).popup()
     }
@@ -178,8 +178,8 @@ function setupWindow(win, url) {
 
   // Context menu for embedded webviews
   win.webContents.on('did-attach-webview', (_event, webviewWC) => {
-    webviewWC.on('context-menu', (_ev, params) => {
-      const template = buildContextMenu(params, webviewWC)
+    webviewWC.on('context-menu', (_ev, parameters) => {
+      const template = buildContextMenu(parameters, webviewWC)
       if (template.length > 0) {
         Menu.buildFromTemplate(template).popup()
       }
@@ -187,12 +187,14 @@ function setupWindow(win, url) {
   })
 
   win.on('close', (e) => {
-    if (!isQuitting && allWindows.size <= 1) {
-      // Last tab: hide the app instead of closing the window
-      e.preventDefault()
-      app.hide()
+    // Let the window close normally unless it's the last tab — macOS removes the tab
+    if (isQuitting || allWindows.size > 1) {
+      return
     }
-    // Otherwise let the window close normally — macOS removes the tab
+
+    // Last tab: hide the app instead of closing the window
+    e.preventDefault()
+    app.hide()
   })
 
   // Send URL after the window is ready
@@ -203,64 +205,80 @@ function setupWindow(win, url) {
   }
 }
 
-function buildContextMenu(params, webContents) {
+function buildContextMenu(parameters, webContents) {
   const template = []
 
-  if (webContents && params.misspelledWord) {
-    for (const suggestion of params.dictionarySuggestions || []) {
+  if (webContents && parameters.misspelledWord) {
+    for (const suggestion of parameters.dictionarySuggestions || []) {
       template.push({
         label: suggestion,
         click: () => webContents.replaceMisspelling(suggestion),
       })
     }
+
     if (template.length > 0) {
-      template.push({ type: 'separator' })
+      template.push({type: 'separator'})
     }
   }
 
-  if (params.isEditable) {
-    template.push({ role: 'undo' })
-    template.push({ role: 'redo' })
-    template.push({ type: 'separator' })
-    template.push({ role: 'cut' })
-    template.push({ role: 'copy' })
-    template.push({ role: 'paste' })
-    template.push({ role: 'selectAll' })
-  } else if (params.selectionText) {
-    template.push({ role: 'copy' })
+  if (parameters.isEditable) {
+    template.push(
+      {role: 'undo'},
+      {role: 'redo'},
+      {type: 'separator'},
+      {role: 'cut'},
+      {role: 'copy'},
+      {role: 'paste'},
+      {role: 'selectAll'},
+    )
+  } else if (parameters.selectionText) {
+    template.push({role: 'copy'})
   }
 
-  if (params.linkURL) {
-    if (template.length > 0) template.push({ type: 'separator' })
+  if (parameters.linkURL) {
+    if (template.length > 0) {
+      template.push({type: 'separator'})
+    }
+
     template.push({
       label: 'Open Link in Browser',
-      click: () => shell.openExternal(params.linkURL),
+      click: () => shell.openExternal(parameters.linkURL),
     })
   }
 
-  if (params.selectionText && params.selectionText.trim().length > 0) {
-    if (template.length > 0) template.push({ type: 'separator' })
-    template.push({
-      label: 'Search Google for "' + params.selectionText + '"',
-      click: () =>
-        shell.openExternal(
-          'https://www.google.com/search?q=' + encodeURIComponent(params.selectionText)
-        ),
-    })
-    template.push({
-      label: 'Search DuckDuckGo for "' + params.selectionText + '"',
-      click: () =>
-        shell.openExternal(
-          'https://duckduckgo.com/?q=' + encodeURIComponent(params.selectionText)
-        ),
-    })
+  if (parameters.selectionText && parameters.selectionText.trim().length > 0) {
+    if (template.length > 0) {
+      template.push({type: 'separator'})
+    }
+
+    template.push(
+      {
+        label: 'Search Google for "' + parameters.selectionText + '"',
+        click: () =>
+          shell.openExternal(
+            'https://www.google.com/search?q=' +
+              encodeURIComponent(parameters.selectionText),
+          ),
+      },
+      {
+        label: 'Search DuckDuckGo for "' + parameters.selectionText + '"',
+        click: () =>
+          shell.openExternal(
+            'https://duckduckgo.com/?q=' +
+              encodeURIComponent(parameters.selectionText),
+          ),
+      },
+    )
   }
 
   if (webContents) {
-    if (template.length > 0) template.push({ type: 'separator' })
+    if (template.length > 0) {
+      template.push({type: 'separator'})
+    }
+
     template.push({
       label: 'Inspect Element',
-      click: () => {
+      click() {
         if (webContents.isDevToolsOpened()) {
           webContents.devToolsWebContents.focus()
         } else {
@@ -289,7 +307,7 @@ app.on('ready', () => {
     }
   }
 
-  Menu.setApplicationMenu(createMenu({ toggleWindow }))
+  Menu.setApplicationMenu(createMenu({toggleWindow}))
   mainWindow = createMainWindow()
   tray.create(mainWindow)
 
@@ -316,7 +334,9 @@ let hasOpenedOnce = false
 app.on('browser-window-focus', () => {
   if (hasOpenedOnce) {
     const win = BrowserWindow.getFocusedWindow()
-    if (win) win.webContents.send('focus-webview')
+    if (win) {
+      win.webContents.send('focus-webview')
+    }
   } else {
     hasOpenedOnce = true
   }
@@ -334,7 +354,8 @@ app.setAsDefaultProtocolClient('devdocs')
 
 app.on('will-finish-launching', () => {
   app.on('open-url', (_e, url) => {
-    const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
+    const win =
+      BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
     if (win) {
       win.webContents.send('navigate', url)
     } else {

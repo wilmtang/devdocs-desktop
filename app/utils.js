@@ -1,7 +1,7 @@
-const os = require('os')
-const path = require('path')
-const { globalShortcut } = require('electron')
-const config = require('./config')
+const os = require('node:os')
+const path = require('node:path')
+const {globalShortcut} = require('electron')
+const config = require('./config.js')
 
 const home = os.homedir()
 
@@ -13,15 +13,15 @@ exports.toggleGlobalShortcut = function ({
   name,
   registered,
   accelerator,
-  action
+  action,
 }) {
   if (registered) {
     globalShortcut.unregister(accelerator)
     config.delete(`shortcut.${name}`)
   } else {
-    const ret = globalShortcut.register(accelerator, action)
+    const returnValue = globalShortcut.register(accelerator, action)
     config.set(`shortcut.${name}`, accelerator)
-    if (!ret) {
+    if (!returnValue) {
       console.error(`Failed to register ${accelerator}`)
     }
   }

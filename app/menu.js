@@ -1,13 +1,7 @@
-const {
-  Menu,
-  shell,
-  globalShortcut,
-  BrowserWindow,
-  dialog
-} = require('electron')
-const { configDir, toggleGlobalShortcut } = require('./utils')
-const config = require('./config')
-const pkg = require('./package')
+const {Menu, shell, globalShortcut, BrowserWindow, dialog} = require('electron')
+const {configDir, toggleGlobalShortcut} = require('./utils.js')
+const config = require('./config.js')
+const pkg = require('./package.json')
 
 function sendAction(action, ...args) {
   const [win] = BrowserWindow.getAllWindows()
@@ -17,16 +11,15 @@ function sendAction(action, ...args) {
   }
 }
 
-function updateMenu(opts) {
-  Menu.setApplicationMenu(createMenu(opts))
+function updateMenu(options) {
+  Menu.setApplicationMenu(createMenu(options))
 }
 
-function createMenu(opts) {
+function createMenu(options) {
   const toggleAppAccelerator =
     config.get('shortcut.toggleApp') || 'CmdOrCtrl+Shift+D'
-  const toggleAppAcceleratorRegistered = globalShortcut.isRegistered(
-    toggleAppAccelerator
-  )
+  const toggleAppAcceleratorRegistered =
+    globalShortcut.isRegistered(toggleAppAccelerator)
 
   const preferences = [
     {
@@ -36,13 +29,13 @@ function createMenu(opts) {
           label: 'Custom CSS',
           async click() {
             shell.openPath(configDir('custom.css'))
-          }
+          },
         },
         {
           label: 'Custom JS',
           async click() {
             shell.openPath(configDir('custom.js'))
-          }
+          },
         },
         {
           label: `${
@@ -53,59 +46,58 @@ function createMenu(opts) {
               name: 'toggleApp',
               registered: toggleAppAcceleratorRegistered,
               accelerator: toggleAppAccelerator,
-              action: opts.toggleWindow
+              action: options.toggleWindow,
             })
-            updateMenu(opts)
-          }
-        }
-      ]
+            updateMenu(options)
+          },
+        },
+      ],
     },
     {
-      type: 'separator'
-    }
+      type: 'separator',
+    },
   ]
 
   const checkForUpdates = {
     label: 'Check for Updates',
     async click(item, focusedWindow) {
-      if (!focusedWindow) return
+      if (!focusedWindow) {
+        return
+      }
 
       try {
         const res = await fetch(
           'https://api.github.com/repos/egoist/devdocs-desktop/releases/latest',
-          { headers: { Accept: 'application/vnd.github.v3+json' } }
+          {headers: {Accept: 'application/vnd.github.v3+json'}},
         )
         const latest = await res.json()
 
         if (compareSemver(latest.tag_name.slice(1), pkg.version) === 1) {
-          const { response } = await dialog.showMessageBox(
-            focusedWindow,
-            {
-              type: 'info',
-              message: 'New update available!',
-              detail: 'A new release (' + latest.tag_name + ') is available.',
-              buttons: ['View on GitHub', 'Cancel'],
-              defaultId: 0
-            }
-          )
+          const {response} = await dialog.showMessageBox(focusedWindow, {
+            type: 'info',
+            message: 'New update available!',
+            detail: 'A new release (' + latest.tag_name + ') is available.',
+            buttons: ['View on GitHub', 'Cancel'],
+            defaultId: 0,
+          })
           if (response === 0) {
             shell.openExternal(
-              'https://github.com/egoist/devdocs-desktop/releases/latest'
+              'https://github.com/egoist/devdocs-desktop/releases/latest',
             )
           }
         } else {
           dialog.showMessageBox(focusedWindow, {
             message: 'No updates',
-            detail: 'v' + pkg.version + ' is the latest version.'
+            detail: 'v' + pkg.version + ' is the latest version.',
           })
         }
-      } catch (_) {
+      } catch {
         dialog.showMessageBox(focusedWindow, {
           message: 'Update check failed',
           detail: 'Could not reach GitHub. Try again later.',
         })
       }
-    }
+    },
   }
 
   const template = [
@@ -113,36 +105,36 @@ function createMenu(opts) {
       label: 'DevDocs',
       submenu: [
         {
-          role: 'about'
+          role: 'about',
         },
         checkForUpdates,
         {
-          type: 'separator'
+          type: 'separator',
         },
         ...preferences,
         {
           role: 'services',
-          submenu: []
+          submenu: [],
         },
         {
-          type: 'separator'
+          type: 'separator',
         },
         {
-          role: 'hide'
+          role: 'hide',
         },
         {
-          role: 'hideothers'
+          role: 'hideothers',
         },
         {
-          role: 'unhide'
+          role: 'unhide',
         },
         {
-          type: 'separator'
+          type: 'separator',
         },
         {
-          role: 'quit'
-        }
-      ]
+          role: 'quit',
+        },
+      ],
     },
     {
       label: 'File',
@@ -152,64 +144,68 @@ function createMenu(opts) {
           accelerator: 'CmdOrCtrl+T',
           click() {
             const win = BrowserWindow.getFocusedWindow()
-            if (win) win.emit('new-window-for-tab')
-          }
+            if (win) {
+              win.emit('new-window-for-tab')
+            }
+          },
         },
         {
           label: 'Close Tab',
           accelerator: 'CmdOrCtrl+W',
           click() {
             const win = BrowserWindow.getFocusedWindow()
-            if (win) win.close()
-          }
-        }
-      ]
+            if (win) {
+              win.close()
+            }
+          },
+        },
+      ],
     },
     {
       label: 'Edit',
       submenu: [
         {
-          role: 'undo'
+          role: 'undo',
         },
         {
-          role: 'redo'
+          role: 'redo',
         },
         {
-          type: 'separator'
+          type: 'separator',
         },
         {
-          role: 'cut'
+          role: 'cut',
         },
         {
-          role: 'copy'
+          role: 'copy',
         },
         {
-          role: 'paste'
+          role: 'paste',
         },
         {
-          role: 'pasteandmatchstyle'
+          role: 'pasteandmatchstyle',
         },
         {
-          role: 'delete'
+          role: 'delete',
         },
         {
-          role: 'selectall'
+          role: 'selectall',
         },
         {
-          type: 'separator'
+          type: 'separator',
         },
         {
           label: 'Speech',
           submenu: [
             {
-              role: 'startspeaking'
+              role: 'startspeaking',
             },
             {
-              role: 'stopspeaking'
-            }
-          ]
-        }
-      ]
+              role: 'stopspeaking',
+            },
+          ],
+        },
+      ],
     },
     {
       label: 'View',
@@ -219,53 +215,57 @@ function createMenu(opts) {
           accelerator: 'CmdOrCtrl+0',
           click() {
             sendAction('zoom-reset')
-          }
+          },
         },
         {
           label: 'Increase Text Size',
           accelerator: 'CmdOrCtrl+Plus',
           click() {
             sendAction('zoom-in')
-          }
+          },
         },
         {
           label: 'Decrease Text Size',
           accelerator: 'CmdOrCtrl+-',
           click() {
             sendAction('zoom-out')
-          }
+          },
         },
         {
-          type: 'separator'
+          type: 'separator',
         },
         {
           label: 'Search In Page',
           accelerator: 'CmdOrCtrl+F',
           click(item, focusedWindow) {
             focusedWindow.webContents.send('open-search')
-          }
+          },
         },
         {
-          type: 'separator'
+          type: 'separator',
         },
         {
           label: 'Reload',
           accelerator: 'CmdOrCtrl+R',
           click(item, focusedWindow) {
-            if (focusedWindow) focusedWindow.reload()
-          }
+            if (focusedWindow) {
+              focusedWindow.reload()
+            }
+          },
         },
         {
           label: 'Toggle Developer Tools',
           accelerator: 'Alt+Command+I',
           click(item, focusedWindow) {
-            if (focusedWindow) focusedWindow.webContents.toggleDevTools()
-          }
-        }
-      ]
+            if (focusedWindow) {
+              focusedWindow.webContents.toggleDevTools()
+            }
+          },
+        },
+      ],
     },
     {
-      role: 'window'
+      role: 'window',
     },
     {
       role: 'help',
@@ -274,12 +274,12 @@ function createMenu(opts) {
           label: 'Report Issues',
           click() {
             shell.openExternal(
-              'http://github.com/egoist/devdocs-desktop/issues/new'
+              'https://github.com/egoist/devdocs-desktop/issues/new',
             )
-          }
-        }
-      ]
-    }
+          },
+        },
+      ],
+    },
   ]
 
   return Menu.buildFromTemplate(template)
@@ -289,9 +289,15 @@ function compareSemver(a, b) {
   const pa = a.split('.').map(Number)
   const pb = b.split('.').map(Number)
   for (let i = 0; i < 3; i++) {
-    if (pa[i] > pb[i]) return 1
-    if (pa[i] < pb[i]) return -1
+    if (pa[i] > pb[i]) {
+      return 1
+    }
+
+    if (pa[i] < pb[i]) {
+      return -1
+    }
   }
+
   return 0
 }
 

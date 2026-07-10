@@ -1,6 +1,6 @@
-const { app } = require('electron')
+const {app} = require('electron')
 const log = require('electron-log')
-const { autoUpdater } = require('electron-updater')
+const {autoUpdater} = require('electron-updater')
 
 exports.init = () => {
   if (!app.isPackaged || process.platform === 'linux') {

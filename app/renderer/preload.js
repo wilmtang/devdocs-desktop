@@ -1,4 +1,4 @@
-const { ipcRenderer } = require('electron')
+const {ipcRenderer} = require('electron')
 
 let zoomFactor = 1
 
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.body.append(style)
 
   // Detect initial dark mode
-  if (/dark=1;/.test(document.cookie)) {
+  if (/dark=1;/v.test(document.cookie)) {
     ipcRenderer.sendToHost('switch-mode', 'dark')
   } else {
     ipcRenderer.sendToHost('switch-mode', 'light')

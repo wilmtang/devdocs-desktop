@@ -1,9 +1,9 @@
-const path = require('path')
-const { app, Menu, Tray } = require('electron')
+const path = require('node:path')
+const {app, Menu, Tray} = require('electron')
 
 let tray = null
 
-exports.create = win => {
+exports.create = (win) => {
   if (process.platform === 'darwin' || tray) {
     return
   }
@@ -23,18 +23,18 @@ exports.create = win => {
       label: 'Toggle',
       click() {
         toggleWin()
-      }
+      },
     },
     {
-      type: 'separator'
+      type: 'separator',
     },
     {
-      role: 'quit'
-    }
+      role: 'quit',
+    },
   ])
 
   tray = new Tray(iconPath)
-  tray.setToolTip(`${app.getName()}`)
+  tray.setToolTip(app.name)
   tray.setContextMenu(contextMenu)
   tray.on('click', toggleWin)
 }

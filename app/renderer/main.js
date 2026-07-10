@@ -10,16 +10,6 @@
   let searcher = null
   let pendingNavigate = null
 
-  // Panel only touches the DOM lazily, so it can exist before the webview —
-  // that lets its IPC listener register early like the others below
-  const shortcutPanel = new globalThis.ShortcutPanel(api, {
-    onClose() {
-      if (webview) {
-        webview.focus()
-      }
-    },
-  })
-
   function navigateTo(url) {
     if (!webview || !webview.__ready) {
       pendingNavigate = url
@@ -45,8 +35,26 @@
       searcher.open()
     }
   })
-  api.onIPC('open-shortcut-settings', () => {
-    shortcutPanel.open()
+  // Open DevDocs' own Preferences page (where the global-shortcut setting is
+  // grafted in by preload.js). Use DevDocs' client-side router so it doesn't
+  // reload; fall back to a normal navigation if the app object isn't ready.
+  api.onIPC('open-preferences', () => {
+    if (!webview) {
+      return
+    }
+
+    webview
+      .executeJavaScript(
+        "window.app && app.router ? (app.router.show('/settings'), true) : false",
+      )
+      .then((handled) => {
+        if (!handled) {
+          webview.src = HOME_URL + '/settings'
+        }
+      })
+      .catch(() => {
+        webview.src = HOME_URL + '/settings'
+      })
   })
   api.onIPC('focus-webview', () => {
     if (webview) {

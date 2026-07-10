@@ -16,12 +16,12 @@ function sendAction(action, ...args) {
 function createMenu() {
   const preferences = [
     {
-      // Standard Settings entry (⌘, / Ctrl+,). Opens the in-window settings
-      // panel, which is where the global shortcut and its enable toggle live.
+      // Standard Settings entry (⌘, / Ctrl+,). Opens DevDocs' own Preferences
+      // page, where the global-shortcut setting is grafted in (see preload.js).
       label: 'Settings…',
       accelerator: 'CmdOrCtrl+,',
       click() {
-        sendAction('open-shortcut-settings')
+        sendAction('open-preferences')
       },
     },
     {

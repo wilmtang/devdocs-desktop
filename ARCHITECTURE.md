@@ -393,19 +393,7 @@ leaves focus nowhere useful); otherwise show + focus. The menu item flips
 registration at runtime and persists the flag, then rebuilds the menu so its
 label updates.
 
-The combo itself is user-configurable: Preferences ▸ *Change Global
-Shortcut…* opens an in-window recorder panel (`renderer/shortcut-panel.js`,
-Dash-style: click the field, press the combo). All registration flows through
-`utils.updateShortcut`, which releases the previously stored accelerator
-before registering the new one and, if the OS rejects the combo (taken by
-another app, `register()` returns false or throws on malformed strings),
-restores the old registration and reports failure so the panel can show an
-error instead of silently losing the shortcut. While the panel records,
-`shortcut:suspend` releases the live registration so pressing the current
-combo doesn't hide the window mid-recording. The renderer maps
-`KeyboardEvent.code` to Electron accelerator syntax and requires at least one
-modifier for non-function keys; display is symbolic on macOS (`⌃⌥Space`),
-`Ctrl+Alt+Space`-style elsewhere.
+The combo itself is user-configurable via the Preferences page (Preferences ▸ *Change Global Shortcut…*). Because the Preferences page is remote devdocs.io content, the app cannot add the shortcut settings server-side. Instead, the guest preload script (`app/renderer/preload.js`) uses a `MutationObserver` to graft a native-looking "Global Shortcut" fieldset directly into the live devdocs.io DOM when the settings page is opened. All registration flows from the injected UI through the `ipcRenderer.invoke('shortcut:set')` bridge to the main process (`utils.updateShortcut`), which releases the previously stored accelerator before registering the new one. If the OS rejects the combo, it restores the old registration and reports failure so the injected panel can show an error instead of silently losing the shortcut. While the panel records, `shortcut:suspend` releases the live registration so pressing the current combo doesn't hide the window mid-recording. The renderer maps `KeyboardEvent.code` to Electron accelerator syntax and requires at least one modifier for non-function keys; display is symbolic on macOS (`⌃⌥Space`), `Ctrl+Alt+Space`-style elsewhere.
 
 The tray exists only on Windows/Linux (`tray.js` returns early on darwin —
 macOS already has the dock for the hide-don't-quit lifecycle). Click toggles

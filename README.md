@@ -71,4 +71,4 @@ npm run dist
 
 ## License
 
-MIT &copy; [EGOIST](https://github.com/egoist)
+AGPL-3.0 &copy; [EGOIST](https://github.com/egoist)

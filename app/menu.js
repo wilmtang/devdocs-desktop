@@ -308,7 +308,7 @@ function createMenu({cycleTab, selectTabAtIndex}) {
         },
         {
           label: 'Toggle Developer Tools',
-          accelerator: 'Alt+Command+I',
+          accelerator: isMac ? 'Alt+Command+I' : 'Control+Shift+I',
           click(item, focusedWindow) {
             if (focusedWindow) {
               focusedWindow.webContents.toggleDevTools()

@@ -439,7 +439,7 @@ function openUrlInTab(url, parentWin) {
 }
 
 function createTabWindow(url) {
-  const lastWindowState = config.get('lastWindowState')
+  const lastWindowState = config.get('lastWindowState') || {}
   const offset = allWindows.size * 24
   const x =
     typeof lastWindowState.x === 'number'
@@ -482,7 +482,7 @@ function createTabWindow(url) {
 }
 
 function createMainWindow() {
-  const lastWindowState = config.get('lastWindowState')
+  const lastWindowState = config.get('lastWindowState') || {}
 
   const win = new BrowserWindow({
     title: app.name,

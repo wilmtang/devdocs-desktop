@@ -47,8 +47,9 @@ document.addEventListener('DOMContentLoaded', () => {
   style.textContent = 'body {zoom: ' + zoomFactor + ' !important}'
   document.body.append(style)
 
-  // Detect initial dark mode
-  if (/dark=1;/v.test(document.cookie)) {
+  // Detect initial dark mode (dark=1 may be the last cookie, without a
+  // trailing semicolon)
+  if (/(?:^|;\s*)dark=1(?:;|$)/v.test(document.cookie)) {
     ipcRenderer.sendToHost('switch-mode', 'dark')
   } else {
     ipcRenderer.sendToHost('switch-mode', 'light')

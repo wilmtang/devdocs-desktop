@@ -9,20 +9,17 @@ exports.configDir = function (...args) {
   return path.join(home, '.devdocs', ...args)
 }
 
-exports.toggleGlobalShortcut = function ({
-  name,
-  registered,
-  accelerator,
-  action,
-}) {
-  if (registered) {
-    globalShortcut.unregister(accelerator)
-    config.delete(`shortcut.${name}`)
-  } else {
-    const returnValue = globalShortcut.register(accelerator, action)
-    config.set(`shortcut.${name}`, accelerator)
-    if (!returnValue) {
+exports.toggleGlobalShortcut = function ({name, accelerator, enable, action}) {
+  if (enable) {
+    const registered = globalShortcut.register(accelerator, action)
+    if (!registered) {
       console.error(`Failed to register ${accelerator}`)
     }
+  } else {
+    globalShortcut.unregister(accelerator)
   }
+
+  const shortcuts = config.get('shortcut') || {}
+  shortcuts[name] = {accelerator, enabled: enable}
+  config.set('shortcut', shortcuts)
 }

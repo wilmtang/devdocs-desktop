@@ -1,13 +1,15 @@
 const path = require('node:path')
-const fs = require('node:fs')
-const {app, BrowserWindow, Menu, ipcMain, shell, dialog} = require('electron')
+const fs = require('node:fs/promises')
+const {app, BrowserWindow, Menu, ipcMain, shell} = require('electron')
 const createMenu = require('./menu.js')
 const config = require('./config.js')
 const tray = require('./tray.js')
 const updater = require('./updater.js')
-const {toggleGlobalShortcut} = require('./utils.js')
+const {configDir, toggleGlobalShortcut} = require('./utils.js')
 
 app.setAppUserModelId('sh.egoist.devdocs')
+
+const isMac = process.platform === 'darwin'
 
 let mainWindow
 let isQuitting = false
@@ -17,10 +19,11 @@ let urlToOpen
 const allWindows = new Set()
 
 if (!app.requestSingleInstanceLock()) {
-  app.quit()
+  // Exit immediately: app.quit() alone lets the rest of startup run first
+  app.exit(0)
 }
 
-app.on('second-instance', () => {
+app.on('second-instance', (_event, argv) => {
   const win = BrowserWindow.getAllWindows()[0]
   if (win) {
     if (win.isMinimized()) {
@@ -28,8 +31,63 @@ app.on('second-instance', () => {
     }
 
     win.show()
+    win.focus()
+  }
+
+  // On Windows/Linux protocol URLs arrive via the second instance's argv
+  const url = argv.find((arg) => arg.startsWith('devdocs://'))
+  if (url) {
+    openDeepLink(url)
   }
 })
+
+// --- URL helpers ---
+
+function isHttpUrl(url) {
+  try {
+    const {protocol} = new URL(url)
+    return protocol === 'https:' || protocol === 'http:'
+  } catch {
+    return false
+  }
+}
+
+function isDevdocsUrl(url) {
+  try {
+    const parsed = new URL(url)
+    return isHttpUrl(url) && parsed.hostname === 'devdocs.io'
+  } catch {
+    return false
+  }
+}
+
+function openExternal(url) {
+  if (isHttpUrl(url)) {
+    shell.openExternal(url)
+  }
+}
+
+function openDeepLink(url) {
+  const win =
+    BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
+  if (win) {
+    win.show()
+    win.webContents.send('navigate', url)
+  } else {
+    urlToOpen = url
+  }
+}
+
+// Renderer file access is limited to the ~/.devdocs config directory
+function resolveConfigPath(filePath) {
+  const base = configDir()
+  const resolved = path.resolve(base, String(filePath))
+  if (resolved !== base && !resolved.startsWith(base + path.sep)) {
+    throw new Error('Access denied: path is outside ' + base)
+  }
+
+  return resolved
+}
 
 // --- IPC handlers ---
 
@@ -39,40 +97,22 @@ ipcMain.handle('config:set', (_event, key, value) => {
   config.set(key, value)
 })
 
-ipcMain.handle('shell:openExternal', (_event, url) => {
-  shell.openExternal(url)
-})
-
-ipcMain.handle('window:maximize', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender)
-  if (win) {
-    win.maximize()
-  }
-})
-
-ipcMain.handle('dialog:messageBox', async (event, options) => {
-  const win = BrowserWindow.fromWebContents(event.sender)
-  return dialog.showMessageBox(win, options)
-})
-
 ipcMain.handle('fs:readFile', (_event, filePath) =>
-  fs.readFileSync(filePath, 'utf8'),
+  fs.readFile(resolveConfigPath(filePath), 'utf8'),
 )
 
-ipcMain.handle('fs:writeFile', (_event, filePath, data) => {
-  fs.mkdirSync(path.dirname(filePath), {recursive: true})
-  fs.writeFileSync(filePath, data, 'utf8')
+ipcMain.handle('fs:writeFile', async (_event, filePath, data) => {
+  const target = resolveConfigPath(filePath)
+  await fs.mkdir(path.dirname(target), {recursive: true})
+  await fs.writeFile(target, data, 'utf8')
 })
 
-ipcMain.handle('fs:exists', (_event, filePath) => fs.existsSync(filePath))
-
-// Create a new tab window (triggered by renderer when a link wants a new window)
-ipcMain.on('create-tab', (_event, url) => {
-  const tab = createTabWindow(url)
-  const focused = BrowserWindow.getFocusedWindow()
-  if (focused) {
-    focused.addTabbedWindow(tab)
-    tab.show()
+ipcMain.handle('fs:exists', async (_event, filePath) => {
+  try {
+    await fs.access(resolveConfigPath(filePath))
+    return true
+  } catch {
+    return false
   }
 })
 
@@ -86,23 +126,46 @@ function toggleWindow() {
   }
 
   if (win.isFocused()) {
-    Menu.sendActionToFirstResponder('hide:')
+    if (isMac) {
+      Menu.sendActionToFirstResponder('hide:')
+    } else {
+      win.hide()
+    }
   } else {
     win.show()
     win.focus()
   }
 }
 
+function openUrlInTab(url, parentWin) {
+  const tab = createTabWindow(url)
+  const parent = parentWin || BrowserWindow.getFocusedWindow()
+  // Native tabs only exist on macOS; elsewhere the tab is a plain window
+  if (isMac && parent && !parent.isDestroyed()) {
+    parent.addTabbedWindow(tab)
+  }
+
+  tab.show()
+}
+
 function createTabWindow(url) {
   const lastWindowState = config.get('lastWindowState')
   const offset = allWindows.size * 24
+  const x =
+    typeof lastWindowState.x === 'number'
+      ? lastWindowState.x + offset
+      : undefined
+  const y =
+    typeof lastWindowState.y === 'number'
+      ? lastWindowState.y + offset
+      : undefined
 
   const win = new BrowserWindow({
     title: app.name,
-    x: lastWindowState.x && lastWindowState.x + offset,
-    y: lastWindowState.y && lastWindowState.y + offset,
-    width: lastWindowState.width || 1000,
-    height: lastWindowState.height || 700,
+    x,
+    y,
+    width: lastWindowState.width || 800,
+    height: lastWindowState.height || 600,
     minWidth: 600,
     minHeight: 400,
     show: false,
@@ -133,8 +196,8 @@ function createMainWindow() {
     title: app.name,
     x: lastWindowState.x,
     y: lastWindowState.y,
-    width: lastWindowState.width,
-    height: lastWindowState.height,
+    width: lastWindowState.width || 800,
+    height: lastWindowState.height || 600,
     minWidth: 600,
     minHeight: 400,
     show: false,
@@ -151,6 +214,14 @@ function createMainWindow() {
   setupWindow(win, null)
   allWindows.add(win)
 
+  // Persist bounds whenever the main window is closed or hidden, so state
+  // survives quitting from the tray (when no window is focused)
+  win.on('close', () => {
+    if (!win.isFullScreen()) {
+      config.set('lastWindowState', win.getBounds())
+    }
+  })
+
   win.on('closed', () => {
     allWindows.delete(win)
   })
@@ -164,7 +235,10 @@ function setupWindow(win, url) {
   // macOS native tabs: create a new tabbed window when Cmd+T or + button is clicked
   win.on('new-window-for-tab', () => {
     const tab = createTabWindow()
-    win.addTabbedWindow(tab)
+    if (isMac) {
+      win.addTabbedWindow(tab)
+    }
+
     tab.show()
   })
 
@@ -176,8 +250,31 @@ function setupWindow(win, url) {
     }
   })
 
-  // Context menu for embedded webviews
   win.webContents.on('did-attach-webview', (_event, webviewWC) => {
+    // Route new windows: devdocs links become tabs, everything else opens
+    // in the default browser. (The webview `new-window` DOM event no longer
+    // exists in modern Electron.)
+    webviewWC.setWindowOpenHandler(({url: targetUrl}) => {
+      if (isDevdocsUrl(targetUrl)) {
+        openUrlInTab(targetUrl, win)
+      } else {
+        openExternal(targetUrl)
+      }
+
+      return {action: 'deny'}
+    })
+
+    // Keep the embedded view on devdocs.io; open other sites externally
+    webviewWC.on('will-navigate', (event, targetUrl) => {
+      if (isDevdocsUrl(targetUrl)) {
+        return
+      }
+
+      event.preventDefault()
+      openExternal(targetUrl)
+    })
+
+    // Context menu for embedded webviews
     webviewWC.on('context-menu', (_ev, parameters) => {
       const template = buildContextMenu(parameters, webviewWC)
       if (template.length > 0) {
@@ -194,7 +291,12 @@ function setupWindow(win, url) {
 
     // Last tab: hide the app instead of closing the window
     e.preventDefault()
-    app.hide()
+    if (isMac) {
+      app.hide()
+    } else {
+      // app.hide() is macOS-only; hide to tray elsewhere
+      win.hide()
+    }
   })
 
   // Send URL after the window is ready
@@ -242,7 +344,7 @@ function buildContextMenu(parameters, webContents) {
 
     template.push({
       label: 'Open Link in Browser',
-      click: () => shell.openExternal(parameters.linkURL),
+      click: () => openExternal(parameters.linkURL),
     })
   }
 
@@ -294,14 +396,14 @@ function buildContextMenu(parameters, webContents) {
 // --- App lifecycle ---
 
 app.on('ready', () => {
-  const shortcut = config.get('shortcut')
-  for (const name in shortcut) {
-    const accelerator = shortcut[name]
-    if (accelerator) {
+  const shortcuts = config.get('shortcut')
+  for (const name in shortcuts) {
+    const {accelerator, enabled} = shortcuts[name] || {}
+    if (accelerator && enabled) {
       toggleGlobalShortcut({
         name,
         accelerator,
-        registered: false,
+        enable: true,
         action: toggleWindow,
       })
     }
@@ -316,6 +418,7 @@ app.on('ready', () => {
     updater.init()
     if (urlToOpen) {
       mainWindow.webContents.send('navigate', urlToOpen)
+      urlToOpen = null
     }
   })
 })
@@ -344,7 +447,9 @@ app.on('browser-window-focus', () => {
 
 app.on('before-quit', () => {
   isQuitting = true
-  const win = BrowserWindow.getFocusedWindow()
+  const win =
+    (mainWindow && !mainWindow.isDestroyed() && mainWindow) ||
+    BrowserWindow.getAllWindows()[0]
   if (win && !win.isFullScreen()) {
     config.set('lastWindowState', win.getBounds())
   }
@@ -352,14 +457,16 @@ app.on('before-quit', () => {
 
 app.setAsDefaultProtocolClient('devdocs')
 
-app.on('will-finish-launching', () => {
-  app.on('open-url', (_e, url) => {
-    const win =
-      BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
-    if (win) {
-      win.webContents.send('navigate', url)
-    } else {
-      urlToOpen = url
-    }
+if (isMac) {
+  app.on('will-finish-launching', () => {
+    // macOS-only event; Windows/Linux get the URL through argv instead
+    app.on('open-url', (_e, url) => {
+      openDeepLink(url)
+    })
   })
-})
+} else {
+  const url = process.argv.find((arg) => arg.startsWith('devdocs://'))
+  if (url) {
+    urlToOpen = url
+  }
+}

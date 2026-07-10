@@ -1,12 +1,18 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
+  <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'">
   <title>Loading DevDocs...</title>
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./search.css">
 </head>
 <body>
-  <div id="app"></div>
+  <div id="load-error" class="load-error" hidden>
+    <h1>Couldn&rsquo;t load devdocs.io</h1>
+    <p class="load-error-detail"></p>
+    <button type="button" class="load-error-retry">Retry</button>
+  </div>
   <script src="./searcher.js"></script>
   <script src="./main.js"></script>
 </body>

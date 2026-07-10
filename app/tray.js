@@ -11,6 +11,10 @@ exports.create = (win) => {
   const iconPath = path.join(__dirname, 'static/tray.png')
 
   const toggleWin = () => {
+    if (win.isDestroyed()) {
+      return
+    }
+
     if (win.isVisible()) {
       win.hide()
     } else {

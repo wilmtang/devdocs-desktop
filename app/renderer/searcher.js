@@ -2,6 +2,7 @@
 // eslint-disable-next-line unicorn/no-global-object-property-assignment
 globalThis.Searcher = class Searcher {
   #listeners = {}
+  #activeQuery = null
   target
   opened = false
   initialized = false
@@ -44,6 +45,7 @@ globalThis.Searcher = class Searcher {
 
   close() {
     this.opened = false
+    this.#activeQuery = null
     this.target.stopFindInPage('clearSelection')
     this.#hideSearcher()
     this.#emit('close')
@@ -95,17 +97,20 @@ globalThis.Searcher = class Searcher {
     this.#emit('initialized')
   }
 
-  #findNext(value, options) {
-    if (value) {
-      this.target.findInPage(value, options)
-    }
-
-    return this
+  #findNext(value) {
+    return this.#find(value, {})
   }
 
-  #findPrev(value, options) {
+  #findPrev(value) {
+    return this.#find(value, {forward: false})
+  }
+
+  #find(value, options) {
     if (value) {
-      this.target.findInPage(value, {forward: false, ...options})
+      // findNext: false starts a new find session; true advances within it
+      const isFindNext = value === this.#activeQuery
+      this.#activeQuery = value
+      this.target.findInPage(value, {...options, findNext: isFindNext})
     }
 
     return this

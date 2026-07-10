@@ -3,7 +3,10 @@ const log = require('electron-log')
 const {autoUpdater} = require('electron-updater')
 
 exports.init = () => {
-  if (!app.isPackaged || process.platform === 'linux') {
+  // electron-updater requires a signed app on macOS and we ship unsigned
+  // builds, so auto-update is Windows-only; other platforms use the manual
+  // "Check for Updates" menu item
+  if (!app.isPackaged || process.platform !== 'win32') {
     return
   }
 

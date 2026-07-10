@@ -19,14 +19,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   configDir,
 
-  openExternal(url) {
-    return ipcRenderer.invoke('shell:openExternal', url)
-  },
-
-  maximize() {
-    return ipcRenderer.invoke('window:maximize')
-  },
-
   onIPC(channel, callback) {
     const valid = [
       'open-search',
@@ -46,14 +38,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.removeListener(channel, listener)
       }
     }
-  },
-
-  sendIPC(...args) {
-    ipcRenderer.send(...args)
-  },
-
-  showMessageBox(options) {
-    return ipcRenderer.invoke('dialog:messageBox', options)
   },
 
   fileExists(p) {

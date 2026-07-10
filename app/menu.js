@@ -3,6 +3,8 @@ const {configDir, toggleGlobalShortcut} = require('./utils.js')
 const config = require('./config.js')
 const pkg = require('./package.json')
 
+const isMac = process.platform === 'darwin'
+
 function sendAction(action, ...args) {
   const [win] = BrowserWindow.getAllWindows()
   if (win) {
@@ -16,8 +18,9 @@ function updateMenu(options) {
 }
 
 function createMenu(options) {
+  const shortcuts = config.get('shortcut') || {}
   const toggleAppAccelerator =
-    config.get('shortcut.toggleApp') || 'CmdOrCtrl+Shift+D'
+    (shortcuts.toggleApp && shortcuts.toggleApp.accelerator) || 'alt+space'
   const toggleAppAcceleratorRegistered =
     globalShortcut.isRegistered(toggleAppAccelerator)
 
@@ -44,8 +47,8 @@ function createMenu(options) {
           click() {
             toggleGlobalShortcut({
               name: 'toggleApp',
-              registered: toggleAppAcceleratorRegistered,
               accelerator: toggleAppAccelerator,
+              enable: !toggleAppAcceleratorRegistered,
               action: options.toggleWindow,
             })
             updateMenu(options)
@@ -61,9 +64,11 @@ function createMenu(options) {
   const checkForUpdates = {
     label: 'Check for Updates',
     async click(item, focusedWindow) {
-      if (!focusedWindow) {
-        return
-      }
+      const win = focusedWindow || BrowserWindow.getAllWindows()[0]
+      const showDialog = (dialogOptions) =>
+        win
+          ? dialog.showMessageBox(win, dialogOptions)
+          : dialog.showMessageBox(dialogOptions)
 
       try {
         const res = await fetch(
@@ -71,9 +76,10 @@ function createMenu(options) {
           {headers: {Accept: 'application/vnd.github.v3+json'}},
         )
         const latest = await res.json()
+        const latestVersion = String(latest.tag_name || '').replace(/^v/v, '')
 
-        if (compareSemver(latest.tag_name.slice(1), pkg.version) === 1) {
-          const {response} = await dialog.showMessageBox(focusedWindow, {
+        if (latestVersion && compareSemver(latestVersion, pkg.version) === 1) {
+          const {response} = await showDialog({
             type: 'info',
             message: 'New update available!',
             detail: 'A new release (' + latest.tag_name + ') is available.',
@@ -86,13 +92,13 @@ function createMenu(options) {
             )
           }
         } else {
-          dialog.showMessageBox(focusedWindow, {
+          showDialog({
             message: 'No updates',
             detail: 'v' + pkg.version + ' is the latest version.',
           })
         }
       } catch {
-        dialog.showMessageBox(focusedWindow, {
+        showDialog({
           message: 'Update check failed',
           detail: 'Could not reach GitHub. Try again later.',
         })
@@ -140,7 +146,7 @@ function createMenu(options) {
       label: 'File',
       submenu: [
         {
-          label: 'New Tab',
+          label: isMac ? 'New Tab' : 'New Window',
           accelerator: 'CmdOrCtrl+T',
           click() {
             const win = BrowserWindow.getFocusedWindow()
@@ -150,7 +156,7 @@ function createMenu(options) {
           },
         },
         {
-          label: 'Close Tab',
+          label: isMac ? 'Close Tab' : 'Close Window',
           accelerator: 'CmdOrCtrl+W',
           click() {
             const win = BrowserWindow.getFocusedWindow()
@@ -225,6 +231,16 @@ function createMenu(options) {
           },
         },
         {
+          // Alias: CmdOrCtrl+Plus needs Shift on most layouts
+          label: 'Increase Text Size',
+          accelerator: 'CmdOrCtrl+=',
+          visible: false,
+          acceleratorWorksWhenHidden: true,
+          click() {
+            sendAction('zoom-in')
+          },
+        },
+        {
           label: 'Decrease Text Size',
           accelerator: 'CmdOrCtrl+-',
           click() {
@@ -286,14 +302,20 @@ function createMenu(options) {
 }
 
 function compareSemver(a, b) {
-  const pa = a.split('.').map(Number)
-  const pb = b.split('.').map(Number)
+  // Strip prerelease/build suffixes ('1.2.3-beta' -> '1.2.3'); missing or
+  // unparseable parts count as 0 instead of poisoning the comparison as NaN
+  const parse = (version) =>
+    version.split(/[+\-]/v, 1)[0].split('.').map(Number)
+  const pa = parse(a)
+  const pb = parse(b)
   for (let i = 0; i < 3; i++) {
-    if (pa[i] > pb[i]) {
+    const x = pa[i] || 0
+    const y = pb[i] || 0
+    if (x > y) {
       return 1
     }
 
-    if (pa[i] < pb[i]) {
+    if (x < y) {
       return -1
     }
   }

@@ -1,7 +1,5 @@
 # DevDocs Desktop
 
-日本語説明ページは[こちら](https://github.com/egoist/devdocs-desktop/blob/master/README-ja.md)
-
 [![version](https://img.shields.io/github/release/egoist/devdocs-desktop.svg?style=flat-square)](https://github.com/egoist/devdocs-desktop/releases)
 [![downloads](https://img.shields.io/github/downloads/egoist/devdocs-desktop/total.svg?style=flat-square)](https://github.com/egoist/devdocs-desktop/releases)
 [![downloads latest](https://img.shields.io/github/downloads/egoist/devdocs-desktop/latest/total.svg?style=flat-square)](https://github.com/egoist/devdocs-desktop/releases/latest)

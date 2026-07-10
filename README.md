@@ -22,16 +22,18 @@ When closing the window, the app will continue running in the background, in the
 
 <img src="https://ooo.0o0.ooo/2017/06/14/59402442301b8.png" alt="help" width="300" />
 
+### Global shortcut
+
+Use <kbd>Alt+Space</kbd> to toggle the app from anywhere (show it when you're in another app, hide it when it's focused).
+
+The combo is customizable: open **Preferences ▸ Change Global Shortcut…**, click the shortcut field, and press the keys you want. The panel also lets you enable/disable the shortcut, and it warns you if the combo is already taken by another app (your previous shortcut stays active in that case).
+
 ## Planned features
 
 Please consider [sponsoring me](http://github.com/sponsors/egoist) to accelerate development.
 
 - Menubar mode: switch beween desktop mode and menubar mode
 - Tabs support: allow to open documentation in a new tab
-
-### Global shortcut
-
-Use <kbd>Alt+Space</kbd> to toggle the app.
 
 ## Install
 
@@ -55,6 +57,8 @@ npm install
 npm run app
 # edit files, save, refresh and it's done.
 ```
+
+For a deep dive into how the app works internally (process model, IPC, security, offline mode), see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Distribute
 

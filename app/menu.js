@@ -1,5 +1,5 @@
 const {Menu, shell, globalShortcut, BrowserWindow, dialog} = require('electron')
-const {configDir, toggleGlobalShortcut} = require('./utils.js')
+const {configDir, updateShortcut} = require('./utils.js')
 const config = require('./config.js')
 const pkg = require('./package.json')
 
@@ -9,6 +9,7 @@ function sendAction(action, ...args) {
   const [win] = BrowserWindow.getAllWindows()
   if (win) {
     win.restore()
+    win.show()
     win.webContents.send(action, ...args)
   }
 }
@@ -41,14 +42,23 @@ function createMenu(options) {
           },
         },
         {
+          type: 'separator',
+        },
+        {
+          label: `Change Global Shortcut… (${toggleAppAccelerator})`,
+          click() {
+            sendAction('open-shortcut-settings')
+          },
+        },
+        {
           label: `${
             toggleAppAcceleratorRegistered ? 'Disable' : 'Enable'
           } Global Shortcut`,
           click() {
-            toggleGlobalShortcut({
+            updateShortcut({
               name: 'toggleApp',
               accelerator: toggleAppAccelerator,
-              enable: !toggleAppAcceleratorRegistered,
+              enabled: !toggleAppAcceleratorRegistered,
               action: options.toggleWindow,
             })
             updateMenu(options)

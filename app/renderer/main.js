@@ -10,6 +10,16 @@
   let searcher = null
   let pendingNavigate = null
 
+  // Panel only touches the DOM lazily, so it can exist before the webview —
+  // that lets its IPC listener register early like the others below
+  const shortcutPanel = new globalThis.ShortcutPanel(api, {
+    onClose() {
+      if (webview) {
+        webview.focus()
+      }
+    },
+  })
+
   function navigateTo(url) {
     if (!webview || !webview.__ready) {
       pendingNavigate = url
@@ -34,6 +44,9 @@
     if (searcher) {
       searcher.open()
     }
+  })
+  api.onIPC('open-shortcut-settings', () => {
+    shortcutPanel.open()
   })
   api.onIPC('focus-webview', () => {
     if (webview) {

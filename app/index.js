@@ -1,11 +1,18 @@
 const path = require('node:path')
 const fs = require('node:fs/promises')
-const {app, BrowserWindow, Menu, ipcMain, shell} = require('electron')
+const {
+  app,
+  BrowserWindow,
+  Menu,
+  ipcMain,
+  shell,
+  globalShortcut,
+} = require('electron')
 const createMenu = require('./menu.js')
 const config = require('./config.js')
 const tray = require('./tray.js')
 const updater = require('./updater.js')
-const {configDir, toggleGlobalShortcut} = require('./utils.js')
+const {configDir, updateShortcut} = require('./utils.js')
 
 app.setAppUserModelId('sh.egoist.devdocs')
 
@@ -114,6 +121,58 @@ ipcMain.handle('fs:exists', async (_event, filePath) => {
   } catch {
     return false
   }
+})
+
+// --- Global shortcut (toggle window) ---
+
+function getToggleShortcut() {
+  const shortcuts = config.get('shortcut') || {}
+  const {accelerator = 'alt+space', enabled = false} = shortcuts.toggleApp || {}
+  return {accelerator, enabled}
+}
+
+ipcMain.handle('shortcut:get', () => getToggleShortcut())
+
+ipcMain.handle('shortcut:set', (_event, accelerator, enabled) => {
+  if (
+    typeof accelerator !== 'string' ||
+    accelerator.length === 0 ||
+    accelerator.length > 64
+  ) {
+    return {ok: false, error: 'Invalid shortcut.', ...getToggleShortcut()}
+  }
+
+  const ok = updateShortcut({
+    name: 'toggleApp',
+    accelerator,
+    enabled: Boolean(enabled),
+    action: toggleWindow,
+  })
+  Menu.setApplicationMenu(createMenu({toggleWindow}))
+  return {
+    ok,
+    error: ok
+      ? null
+      : `Couldn't register "${accelerator}" — it may be taken by another app.`,
+    ...getToggleShortcut(),
+  }
+})
+
+// While the settings panel is recording a new combo, release the current
+// registration so pressing the old combo doesn't hide the window mid-recording
+ipcMain.handle('shortcut:suspend', (_event, suspend) => {
+  const {accelerator, enabled} = getToggleShortcut()
+  if (!accelerator || !enabled) {
+    return
+  }
+
+  try {
+    if (suspend) {
+      globalShortcut.unregister(accelerator)
+    } else if (!globalShortcut.isRegistered(accelerator)) {
+      globalShortcut.register(accelerator, toggleWindow)
+    }
+  } catch {}
 })
 
 // --- Window creation ---
@@ -400,12 +459,7 @@ app.on('ready', () => {
   for (const name in shortcuts) {
     const {accelerator, enabled} = shortcuts[name] || {}
     if (accelerator && enabled) {
-      toggleGlobalShortcut({
-        name,
-        accelerator,
-        enable: true,
-        action: toggleWindow,
-      })
+      updateShortcut({name, accelerator, enabled: true, action: toggleWindow})
     }
   }
 
@@ -414,7 +468,14 @@ app.on('ready', () => {
   tray.create(mainWindow)
 
   mainWindow.once('ready-to-show', () => {
-    mainWindow.show()
+    // Agent/CI verification runs (see AGENT.md): surface the window without
+    // stealing focus from whatever the user is working in
+    if (process.env.DEVDOCS_BACKGROUND === '1') {
+      mainWindow.showInactive()
+    } else {
+      mainWindow.show()
+    }
+
     updater.init()
     if (urlToOpen) {
       mainWindow.webContents.send('navigate', urlToOpen)

@@ -19,9 +19,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   configDir,
 
+  getShortcut() {
+    return ipcRenderer.invoke('shortcut:get')
+  },
+  setShortcut(accelerator, enabled) {
+    return ipcRenderer.invoke('shortcut:set', accelerator, enabled)
+  },
+  suspendShortcut(suspend) {
+    return ipcRenderer.invoke('shortcut:suspend', suspend)
+  },
+
   onIPC(channel, callback) {
     const valid = [
       'open-search',
+      'open-shortcut-settings',
       'focus-webview',
       'navigate',
       'zoom-in',

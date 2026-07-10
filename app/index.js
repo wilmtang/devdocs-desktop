@@ -14,6 +14,7 @@ const tray = require('./tray.js')
 const updater = require('./updater.js')
 const {configDir, updateShortcut} = require('./utils.js')
 const {pickRecentTab, pickSequentialTab} = require('./tabs.js')
+const {resolveDeepLink} = require('./deep-link.js')
 
 process.title = 'DevDocs'
 app.setName('DevDocs')
@@ -96,13 +97,18 @@ function openExternal(url) {
 }
 
 function openDeepLink(url) {
+  const targetUrl = resolveDeepLink(url)
+  if (!targetUrl) {
+    return
+  }
+
   const win =
     BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
   if (win) {
     win.show()
-    win.webContents.send('navigate', url)
+    win.webContents.send('navigate', targetUrl)
   } else {
-    urlToOpen = url
+    urlToOpen = targetUrl
   }
 }
 
@@ -726,6 +732,6 @@ if (isMac) {
 } else {
   const url = process.argv.find((arg) => arg.startsWith('devdocs://'))
   if (url) {
-    urlToOpen = url
+    openDeepLink(url)
   }
 }

@@ -16,15 +16,7 @@
       return
     }
 
-    if (url.startsWith('devdocs://')) {
-      const route = url.replace('devdocs://', '')
-      const match = route.match(/^search\/(?<query>.+)$/v)
-      if (match) {
-        webview.src = HOME_URL + '/#q=' + encodeURIComponent(match.groups.query)
-      }
-    } else {
-      webview.src = url
-    }
+    webview.src = url
   }
 
   // Register IPC listeners before the webview exists: the main process can

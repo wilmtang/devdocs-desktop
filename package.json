@@ -48,6 +48,14 @@
   "build": {
     "appId": "sh.egoist.devdocs",
     "productName": "DevDocs",
+    "protocols": [
+      {
+        "name": "DevDocs URL",
+        "schemes": [
+          "devdocs"
+        ]
+      }
+    ],
     "compression": "maximum",
     "asar": true,
     "dmg": {

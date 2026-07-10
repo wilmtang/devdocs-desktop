@@ -1,6 +1,5 @@
-const {Menu, shell, globalShortcut, BrowserWindow, dialog} = require('electron')
-const {configDir, updateShortcut} = require('./utils.js')
-const config = require('./config.js')
+const {Menu, shell, BrowserWindow, dialog} = require('electron')
+const {configDir} = require('./utils.js')
 const pkg = require('./package.json')
 
 const isMac = process.platform === 'darwin'
@@ -14,57 +13,31 @@ function sendAction(action, ...args) {
   }
 }
 
-function updateMenu(options) {
-  Menu.setApplicationMenu(createMenu(options))
-}
-
-function createMenu(options) {
-  const shortcuts = config.get('shortcut') || {}
-  const toggleAppAccelerator =
-    (shortcuts.toggleApp && shortcuts.toggleApp.accelerator) || 'alt+space'
-  const toggleAppAcceleratorRegistered =
-    globalShortcut.isRegistered(toggleAppAccelerator)
-
+function createMenu() {
   const preferences = [
     {
-      label: 'Preferences',
-      submenu: [
-        {
-          label: 'Custom CSS',
-          async click() {
-            shell.openPath(configDir('custom.css'))
-          },
-        },
-        {
-          label: 'Custom JS',
-          async click() {
-            shell.openPath(configDir('custom.js'))
-          },
-        },
-        {
-          type: 'separator',
-        },
-        {
-          label: `Change Global Shortcut… (${toggleAppAccelerator})`,
-          click() {
-            sendAction('open-shortcut-settings')
-          },
-        },
-        {
-          label: `${
-            toggleAppAcceleratorRegistered ? 'Disable' : 'Enable'
-          } Global Shortcut`,
-          click() {
-            updateShortcut({
-              name: 'toggleApp',
-              accelerator: toggleAppAccelerator,
-              enabled: !toggleAppAcceleratorRegistered,
-              action: options.toggleWindow,
-            })
-            updateMenu(options)
-          },
-        },
-      ],
+      // Standard Settings entry (⌘, / Ctrl+,). Opens the in-window settings
+      // panel, which is where the global shortcut and its enable toggle live.
+      label: 'Settings…',
+      accelerator: 'CmdOrCtrl+,',
+      click() {
+        sendAction('open-shortcut-settings')
+      },
+    },
+    {
+      type: 'separator',
+    },
+    {
+      label: 'Custom CSS',
+      async click() {
+        shell.openPath(configDir('custom.css'))
+      },
+    },
+    {
+      label: 'Custom JS',
+      async click() {
+        shell.openPath(configDir('custom.js'))
+      },
     },
     {
       type: 'separator',

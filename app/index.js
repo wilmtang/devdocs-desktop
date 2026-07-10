@@ -18,6 +18,17 @@ app.setAppUserModelId('sh.egoist.devdocs')
 
 const isMac = process.platform === 'darwin'
 
+// Verification/CI runs launch with DEVDOCS_BACKGROUND=1 (see AGENT.md). Present
+// the app as an accessory agent — the runtime equivalent of LSUIElement — so the
+// launch never activates it, bounces the Dock, or pulls its Space to the front.
+// showInactive() only stops the *window* from taking key focus; without this the
+// *app* still becomes frontmost and steals the user's screen. Called before
+// 'ready' so it applies before any window appears, and gated on the env var so
+// normal launches keep their Dock icon and app menu.
+if (isMac && process.env.DEVDOCS_BACKGROUND === '1') {
+  app.setActivationPolicy('accessory')
+}
+
 let mainWindow
 let isQuitting = false
 let urlToOpen
@@ -148,7 +159,6 @@ ipcMain.handle('shortcut:set', (_event, accelerator, enabled) => {
     enabled: Boolean(enabled),
     action: toggleWindow,
   })
-  Menu.setApplicationMenu(createMenu({toggleWindow}))
   return {
     ok,
     error: ok
@@ -463,7 +473,7 @@ app.on('ready', () => {
     }
   }
 
-  Menu.setApplicationMenu(createMenu({toggleWindow}))
+  Menu.setApplicationMenu(createMenu())
   mainWindow = createMainWindow()
   tray.create(mainWindow)
 

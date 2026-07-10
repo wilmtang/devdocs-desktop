@@ -23,23 +23,36 @@
 }
 
 .shortcut-title {
-  margin: 0 0 4px;
+  margin: 0 0 16px;
   font-size: 16px;
 }
 
+.shortcut-section {
+  margin-bottom: 8px;
+}
+
+.shortcut-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
+}
+
+.shortcut-section-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .shortcut-desc {
-  margin: 0 0 14px;
+  margin: 0 0 10px;
   opacity: 0.7;
 }
 
-.shortcut-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
 .shortcut-recorder {
-  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
   height: 32px;
   padding: 0 10px;
   font: inherit;

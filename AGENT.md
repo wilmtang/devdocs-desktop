@@ -13,12 +13,23 @@ Instead:
 1. **Launch in background mode with a CDP port** (run as a background task):
 
    ```sh
-   DEVDOCS_BACKGROUND=1 npx electron app/index.js --remote-debugging-port=9223
+   DEVDOCS_BACKGROUND=1 npx electron --remote-debugging-port=9223 app/index.js
    ```
 
-   `DEVDOCS_BACKGROUND=1` makes the window appear via `showInactive()` so
-   keyboard focus stays with whatever app the user is using (handled in
-   `app/index.js`).
+   `DEVDOCS_BACKGROUND=1` does two things (both in `app/index.js`): the window
+   appears via `showInactive()` (no keyboard focus), and the app sets
+   `setActivationPolicy('accessory')` so it launches as a menu-bar agent
+   (LaunchServices `type="UIElement"`, like `LSUIElement`) — it never becomes
+   the frontmost app, bounces the Dock, or pulls its Space forward.
+   `showInactive()` alone does NOT prevent this: the *window* stays unfocused
+   but the *app* still activates and steals the screen. Verify with
+   `lsappinfo info <pid> | grep type=` → should read `UIElement`, not
+   `Foreground`.
+
+   **Arg order matters:** `--remote-debugging-port` must come *before*
+   `app/index.js`. Anything after the app path is passed to the app as argv,
+   not to Chromium, so the port never binds and `curl :9223/json/list` returns
+   nothing.
 
 2. **Inspect and drive the UI over CDP**, not the user's screen:
    - Targets: `curl http://127.0.0.1:9223/json/list` — the host renderer is

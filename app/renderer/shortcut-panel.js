@@ -99,16 +99,19 @@ globalThis.ShortcutPanel = class ShortcutPanel {
     const $wrapper = document.createElement('div')
     $wrapper.innerHTML =
       '<div class="shortcut-overlay shortcut-overlay__hidden">' +
-      '<div class="shortcut-panel">' +
-      '<h2 class="shortcut-title">Global Shortcut</h2>' +
-      '<p class="shortcut-desc">Show or hide DevDocs from any app.</p>' +
-      '<div class="shortcut-row">' +
-      '<button type="button" class="shortcut-recorder"></button>' +
+      '<div class="shortcut-panel" role="dialog" aria-label="Settings">' +
+      '<h2 class="shortcut-title">Settings</h2>' +
+      '<section class="shortcut-section">' +
+      '<div class="shortcut-section-head">' +
+      '<h3 class="shortcut-section-title">Global Shortcut</h3>' +
       '<label class="shortcut-enable">' +
       '<input type="checkbox" class="shortcut-enabled-input"> Enabled' +
       '</label>' +
       '</div>' +
+      '<p class="shortcut-desc">Show or hide DevDocs from any app.</p>' +
+      '<button type="button" class="shortcut-recorder"></button>' +
       '<p class="shortcut-error" hidden></p>' +
+      '</section>' +
       '<div class="shortcut-actions">' +
       '<button type="button" class="shortcut-done">Done</button>' +
       '</div>' +
